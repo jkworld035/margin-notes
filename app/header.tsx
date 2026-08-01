@@ -9,12 +9,12 @@ export default async function Header() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let profile: { name: string; role: string } | null = null;
+  let profile: { name: string; role: string; avatar_url: string | null } | null = null;
   let unreadCount = 0;
   if (user) {
     const { data } = await supabase
       .from("profiles")
-      .select("name, role")
+      .select("name, role, avatar_url")
       .eq("id", user.id)
       .single();
     profile = data;
@@ -83,8 +83,16 @@ export default async function Header() {
                 </span>
               )}
             </Link>
-            <Link href="/profile" className="avatar" title={profile?.name}>
-              {(profile?.name || "?")[0].toUpperCase()}
+            <Link href="/profile" className="avatar" title={profile?.name} style={{ overflow: "hidden", padding: 0 }}>
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt=""
+                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                />
+              ) : (
+                (profile?.name || "?")[0].toUpperCase()
+              )}
             </Link>
             <form action={signOut}>
               <button className="btn btn-ghost btn-sm" type="submit">

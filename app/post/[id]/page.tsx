@@ -5,6 +5,7 @@ import { estimateReadTime } from "@/app/actions/posts";
 import { renderContent } from "@/lib/render-content";
 import LikeButton from "./like-button";
 import BookmarkButton from "./bookmark-button";
+import ShareButton from "./share-button";
 import Comments from "./comments";
 import ViewTracker from "./view-tracker";
 import ReadingProgress from "./reading-progress";
@@ -85,7 +86,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
-        <div style={{ marginTop: "2rem", display: "flex", gap: ".6rem" }}>
+        <div style={{ marginTop: "2rem", display: "flex", gap: ".6rem", alignItems: "center" }}>
           <LikeButton
             postId={post.id}
             initialCount={likeCount || 0}
@@ -93,6 +94,12 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
             isLoggedIn={!!user}
           />
           <BookmarkButton postId={post.id} initialSaved={!!myBookmark} isLoggedIn={!!user} />
+          <ShareButton postId={post.id} title={post.title} />
+          {user && user.id === post.author_id && (
+            <Link href={`/write/${post.id}`} className="btn btn-ghost btn-sm">
+              Edit
+            </Link>
+          )}
         </div>
 
         <Comments

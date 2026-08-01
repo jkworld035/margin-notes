@@ -58,6 +58,52 @@ export async function submitPost(formData: FormData) {
   redirect(`/post/${inserted.id}`);
 }
 
+export async function updatePost(postId: string, formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const title = String(formData.get("title") || "").trim();
+  const subtitle = String(formData.get("subtitle") || "").trim();
+  const excerpt = String(formData.get("excerpt") || "").trim();
+  const content = String(formData.get("content") || "").trim();
+  const category = String(formData.get("category") || "Essays");
+  const coverImageUrl = String(formData.get("coverImageUrl") || "").trim();
+  const tagsRaw = String(formData.get("tags") || "");
+  const tags = tagsRaw
+    .split(",")
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 8);
+
+  if (!title || !excerpt || !content) {
+    return { error: "Title, excerpt, and content are all required." };
+  }
+
+  const { error } = await supabase
+    .from("posts")
+    .update({
+      title,
+      subtitle: subtitle || null,
+      excerpt,
+      content,
+      category,
+      tags,
+      cover_image_url: coverImageUrl || null,
+    })
+    .eq("id", postId)
+    .eq("author_id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/post/${postId}`);
+  revalidatePath("/profile");
+  revalidatePath("/");
+  redirect(`/post/${postId}`);
+}
+
 export async function setPostStatus(postId: string, status: "approved" | "rejected") {
   const supabase = await createClient();
   const { error } = await supabase.from("posts").update({ status }).eq("id", postId);

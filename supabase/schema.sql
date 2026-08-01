@@ -9,6 +9,7 @@ create table if not exists public.profiles (
   name text not null,
   email text not null,
   bio text not null default '',
+  avatar_url text,
   role text not null default 'user' check (role in ('user','admin')),
   created_at timestamptz not null default now()
 );
@@ -159,6 +160,13 @@ create policy "admins can update post status"
   to authenticated
   using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'))
   with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
+
+-- Posts: authors can edit their own posts
+create policy "authors can update own posts"
+  on public.posts for update
+  to authenticated
+  using (auth.uid() = author_id)
+  with check (auth.uid() = author_id);
 
 -- Posts: admins can delete any post, authors can delete their own
 create policy "admins or owners can delete posts"

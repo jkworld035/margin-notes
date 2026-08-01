@@ -65,3 +65,17 @@ export async function updateProfile(formData: FormData) {
   revalidatePath("/profile");
   return { success: true };
 }
+
+export async function updateAvatarUrl(url: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const { error } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/profile");
+  return { success: true };
+}

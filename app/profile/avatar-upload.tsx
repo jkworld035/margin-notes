@@ -2,16 +2,11 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { updateAvatarUrl } from "@/app/actions/auth";
 
-export default function CoverImageUpload({
-  onUploaded,
-  initialUrl,
-}: {
-  onUploaded: (url: string) => void;
-  initialUrl?: string;
-}) {
+export default function AvatarUpload({ initialUrl }: { initialUrl: string | null }) {
+  const [url, setUrl] = useState(initialUrl);
   const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(initialUrl || null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -23,8 +18,8 @@ export default function CoverImageUpload({
       setError("Please choose an image file.");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image must be under 5MB.");
+    if (file.size > 3 * 1024 * 1024) {
+      setError("Image must be under 3MB.");
       return;
     }
 
@@ -33,7 +28,6 @@ export default function CoverImageUpload({
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
     if (!user) {
       setError("You must be signed in.");
       setUploading(false);
@@ -41,7 +35,7 @@ export default function CoverImageUpload({
     }
 
     const ext = file.name.split(".").pop();
-    const path = `${user.id}/${Date.now()}.${ext}`;
+    const path = `avatars/${user.id}/${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from("post-images")
@@ -54,23 +48,27 @@ export default function CoverImageUpload({
     }
 
     const { data } = supabase.storage.from("post-images").getPublicUrl(path);
-    setPreviewUrl(data.publicUrl);
-    onUploaded(data.publicUrl);
+    setUrl(data.publicUrl);
+    await updateAvatarUrl(data.publicUrl);
     setUploading(false);
   }
 
   return (
-    <div>
-      <input type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} />
-      {uploading && <p style={{ fontSize: ".8rem", color: "var(--muted)" }}>Uploading…</p>}
-      {error && <div className="form-error">{error}</div>}
-      {previewUrl && (
+    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+      {url ? (
         <img
-          src={previewUrl}
+          src={url}
           alt=""
-          style={{ width: "100%", maxHeight: "200px", objectFit: "cover", marginTop: ".6rem" }}
+          style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover" }}
         />
+      ) : (
+        <div className="profile-avatar-lg" />
       )}
+      <div>
+        <input type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} />
+        {uploading && <p style={{ fontSize: ".78rem", color: "var(--muted)" }}>Uploading…</p>}
+        {error && <div className="form-error">{error}</div>}
+      </div>
     </div>
   );
 }

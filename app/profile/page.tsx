@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import EditProfile from "./edit-profile";
+import AvatarUpload from "./avatar-upload";
+import StoryActions from "./story-actions";
+import ShareButton from "@/app/post/[id]/share-button";
 
 export default async function ProfilePage({
   searchParams,
@@ -19,7 +22,7 @@ export default async function ProfilePage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("name, bio, role")
+    .select("name, bio, role, avatar_url")
     .eq("id", user.id)
     .single();
 
@@ -49,7 +52,7 @@ export default async function ProfilePage({
   return (
     <div className="profile-page">
       <div className="profile-top">
-        <div className="profile-avatar-lg">{(profile?.name || "?")[0].toUpperCase()}</div>
+        <AvatarUpload initialUrl={profile?.avatar_url || null} />
         <div style={{ flex: 1 }}>
           <div className="profile-name">{profile?.name}</div>
           <div className="profile-role">{profile?.role === "admin" ? "Administrator" : "Writer"}</div>
@@ -119,7 +122,7 @@ export default async function ProfilePage({
         ) : (
           posts.map((p: any) => {
             const clickable = p.status === "approved";
-            const Card = (
+            const inner = (
               <>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span className="post-card-tag">{p.category}</span>
@@ -134,13 +137,21 @@ export default async function ProfilePage({
                 </div>
               </>
             );
-            return clickable ? (
-              <Link key={p.id} href={`/post/${p.id}`} className="post-card">
-                {Card}
-              </Link>
-            ) : (
+            return (
               <div key={p.id} className="post-card" style={{ cursor: "default" }}>
-                {Card}
+                {clickable ? (
+                  <Link href={`/post/${p.id}`} style={{ color: "inherit", textDecoration: "none" }}>
+                    {inner}
+                  </Link>
+                ) : (
+                  inner
+                )}
+                {tab === "stories" && (
+                  <div style={{ display: "flex", gap: ".4rem", alignItems: "center" }}>
+                    <StoryActions postId={p.id} />
+                    {clickable && <ShareButton postId={p.id} title={p.title} />}
+                  </div>
+                )}
               </div>
             );
           })
