@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Lora, Outfit } from "next/font/google";
 import "./globals.css";
 import Header from "./header";
-import { Analytics } from "@vercel/analytics/react";
 
 const lora = Lora({
   subsets: ["latin"],
@@ -43,7 +42,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <Header />
         {children}
-        <Analytics />
       </body>
     </html>
   );

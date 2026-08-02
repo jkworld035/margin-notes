@@ -67,20 +67,22 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ count: likeCount }, { data: myLike }, { data: comments }, { data: myBookmark }] = await Promise.all([
-    supabase.from("likes").select("*", { count: "exact", head: true }).eq("post_id", id),
-    user
-      ? supabase.from("likes").select("post_id").eq("post_id", id).eq("user_id", user.id).maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabase
-      .from("comments")
-      .select("id, content, created_at, author_id, profiles(name)")
-      .eq("post_id", id)
-      .order("created_at", { ascending: true }),
-    user
-      ? supabase.from("bookmarks").select("post_id").eq("post_id", id).eq("user_id", user.id).maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const [{ count: likeCount }, { data: myLike }, { data: comments }, { data: myBookmark }, { count: viewCount }] =
+    await Promise.all([
+      supabase.from("likes").select("*", { count: "exact", head: true }).eq("post_id", id),
+      user
+        ? supabase.from("likes").select("post_id").eq("post_id", id).eq("user_id", user.id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("comments")
+        .select("id, content, created_at, author_id, profiles(name)")
+        .eq("post_id", id)
+        .order("created_at", { ascending: true }),
+      user
+        ? supabase.from("bookmarks").select("post_id").eq("post_id", id).eq("user_id", user.id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase.from("post_views").select("*", { count: "exact", head: true }).eq("post_id", id),
+    ]);
 
   return (
     <div>
@@ -101,6 +103,8 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           <span>{new Date(post.created_at).toLocaleDateString()}</span>
           <span className="meta-dot">·</span>
           <span>{estimateReadTime(post.content)} read</span>
+          <span className="meta-dot">·</span>
+          <span>{viewCount || 0} views</span>
         </div>
 
         {post.cover_image_url && (

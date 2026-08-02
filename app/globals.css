@@ -110,6 +110,9 @@ header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px 
   .form-row{grid-template-columns:1fr}
   .header-right{gap:.4rem}
 }
+@media(max-width:760px){
+  .admin-page > div[style*="grid-template-columns"]{grid-template-columns:1fr !important}
+}
 
 /* ── UI upgrade additions ── */
 .header-search{flex:1;max-width:320px;position:relative;display:none}

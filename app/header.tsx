@@ -48,6 +48,9 @@ export default async function Header() {
           </>
         ) : (
           <>
+            <Link href="/dashboard" className="nav-btn">
+              Dashboard
+            </Link>
             <Link href="/write" className="nav-btn">
               Write
             </Link>

@@ -49,6 +49,20 @@ export default async function ProfilePage({
 
   const posts = tab === "saved" ? savedPosts : myPosts || [];
 
+  let viewCounts: Record<string, number> = {};
+  if (tab === "stories" && myPosts && myPosts.length > 0) {
+    const { data: views } = await supabase
+      .from("post_views")
+      .select("post_id")
+      .in(
+        "post_id",
+        myPosts.map((p) => p.id)
+      );
+    (views || []).forEach((v) => {
+      viewCounts[v.post_id] = (viewCounts[v.post_id] || 0) + 1;
+    });
+  }
+
   return (
     <div className="profile-page">
       <div className="profile-top">
@@ -134,6 +148,12 @@ export default async function ProfilePage({
                 <div className="post-card-excerpt">{p.excerpt}</div>
                 <div className="post-card-meta">
                   <span>{new Date(p.created_at).toLocaleDateString()}</span>
+                  {tab === "stories" && (
+                    <>
+                      <span className="meta-dot">·</span>
+                      <span>{viewCounts[p.id] || 0} views</span>
+                    </>
+                  )}
                 </div>
               </>
             );

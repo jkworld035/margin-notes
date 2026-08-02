@@ -4,6 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { updatePost } from "@/app/actions/posts";
 import CoverImageUpload from "../cover-image-upload";
+import EditorToolbar from "../editor-toolbar";
 import { createClient } from "@/lib/supabase/client";
 
 export default function EditPostPage() {
@@ -58,34 +59,6 @@ export default function EditPostPage() {
     }
     load();
   }, [postId]);
-
-  function wrapSelection(before: string, after: string = before) {
-    const el = textareaRef.current;
-    if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const selected = content.slice(start, end) || "text";
-    const next = content.slice(0, start) + before + selected + after + content.slice(end);
-    setContent(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.selectionStart = start + before.length;
-      el.selectionEnd = start + before.length + selected.length;
-    });
-  }
-
-  function prefixLine(prefix: string) {
-    const el = textareaRef.current;
-    if (!el) return;
-    const start = el.selectionStart;
-    const lineStart = content.lastIndexOf("\n", start - 1) + 1;
-    const next = content.slice(0, lineStart) + prefix + content.slice(lineStart);
-    setContent(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.selectionStart = el.selectionEnd = start + prefix.length;
-    });
-  }
 
   async function action(formData: FormData) {
     setPending(true);
@@ -162,26 +135,13 @@ export default function EditPostPage() {
         </div>
         <div className="form-group">
           <label>Content</label>
-          <div style={{ display: "flex", gap: ".4rem", marginBottom: ".5rem" }}>
-            <button type="button" className="btn btn-neutral btn-sm" onClick={() => wrapSelection("**")}>
-              <strong>B</strong>
-            </button>
-            <button type="button" className="btn btn-neutral btn-sm" onClick={() => wrapSelection("*")}>
-              <em>I</em>
-            </button>
-            <button type="button" className="btn btn-neutral btn-sm" onClick={() => prefixLine("## ")}>
-              H2
-            </button>
-            <button type="button" className="btn btn-neutral btn-sm" onClick={() => prefixLine("> ")}>
-              &ldquo;&rdquo;
-            </button>
-          </div>
+          <EditorToolbar content={content} setContent={setContent} textareaRef={textareaRef} />
           <textarea
             ref={textareaRef}
             name="content"
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            maxLength={12000}
+            maxLength={20000}
             required
           />
         </div>

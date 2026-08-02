@@ -3,46 +3,16 @@
 import { useRef, useState } from "react";
 import { submitPost } from "@/app/actions/posts";
 import CoverImageUpload from "./cover-image-upload";
+import EditorToolbar from "./editor-toolbar";
 
 export default function WritePage() {
   const [error, setError] = useState<string | null>(null);
   const [titleLen, setTitleLen] = useState(0);
   const [excerptLen, setExcerptLen] = useState(0);
-  const [contentLen, setContentLen] = useState(0);
   const [content, setContent] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [pending, setPending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  function wrapSelection(before: string, after: string = before) {
-    const el = textareaRef.current;
-    if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const selected = content.slice(start, end) || "text";
-    const next = content.slice(0, start) + before + selected + after + content.slice(end);
-    setContent(next);
-    setContentLen(next.length);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.selectionStart = start + before.length;
-      el.selectionEnd = start + before.length + selected.length;
-    });
-  }
-
-  function prefixLine(prefix: string) {
-    const el = textareaRef.current;
-    if (!el) return;
-    const start = el.selectionStart;
-    const lineStart = content.lastIndexOf("\n", start - 1) + 1;
-    const next = content.slice(0, lineStart) + prefix + content.slice(lineStart);
-    setContent(next);
-    setContentLen(next.length);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.selectionStart = el.selectionEnd = start + prefix.length;
-    });
-  }
 
   async function action(formData: FormData) {
     setPending(true);
@@ -116,38 +86,22 @@ export default function WritePage() {
         </div>
         <div className="form-group">
           <label>Content</label>
-          <div style={{ display: "flex", gap: ".4rem", marginBottom: ".5rem" }}>
-            <button type="button" className="btn btn-neutral btn-sm" onClick={() => wrapSelection("**")} title="Bold">
-              <strong>B</strong>
-            </button>
-            <button type="button" className="btn btn-neutral btn-sm" onClick={() => wrapSelection("*")} title="Italic">
-              <em>I</em>
-            </button>
-            <button type="button" className="btn btn-neutral btn-sm" onClick={() => prefixLine("## ")} title="Heading">
-              H2
-            </button>
-            <button type="button" className="btn btn-neutral btn-sm" onClick={() => prefixLine("> ")} title="Quote">
-              &ldquo;&rdquo;
-            </button>
-          </div>
+          <EditorToolbar content={content} setContent={setContent} textareaRef={textareaRef} />
           <textarea
             ref={textareaRef}
             name="content"
             value={content}
             placeholder="Write your story here. Blank lines separate paragraphs."
-            maxLength={12000}
-            onChange={(e) => {
-              setContent(e.target.value);
-              setContentLen(e.target.value.length);
-            }}
+            maxLength={20000}
+            onChange={(e) => setContent(e.target.value)}
             required
           />
           <div className="form-hint">
             Supports <code>## Heading</code>, <code>&gt; Quote</code>, <code>**bold**</code>,{" "}
-            <code>*italic*</code>. Leave a blank line between paragraphs.
+            <code>*italic*</code>, links, and inline images/videos via the toolbar buttons above.
           </div>
           <div className="char-count">
-            <span>{contentLen}</span>/12000
+            <span>{content.length}</span>/20000
           </div>
         </div>
         <button className="btn btn-primary" type="submit" disabled={pending}>
