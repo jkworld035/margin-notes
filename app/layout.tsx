@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Lora, Outfit } from "next/font/google";
 import "./globals.css";
 import Header from "./header";
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics } from "@vercel/analytics/next";
 
 const lora = Lora({
   subsets: ["latin"],
