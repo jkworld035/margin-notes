@@ -1,8 +1,33 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { estimateReadTime } from "@/app/actions/posts";
 import FollowButton from "./follow-button";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: author } = await supabase.from("profiles").select("name, bio").eq("id", id).single();
+
+  if (!author) return { title: "Author not found — Jkworld035" };
+
+  const description = author.bio || `Read stories by ${author.name} on Jkworld035.`;
+
+  return {
+    title: `${author.name} — Jkworld035`,
+    description,
+    openGraph: {
+      title: `${author.name} on Jkworld035`,
+      description,
+      type: "profile",
+    },
+  };
+}
 
 export default async function AuthorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

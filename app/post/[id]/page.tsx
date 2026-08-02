@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { estimateReadTime } from "@/app/actions/posts";
 import { renderContent } from "@/lib/render-content";
@@ -9,6 +10,44 @@ import ShareButton from "./share-button";
 import Comments from "./comments";
 import ViewTracker from "./view-tracker";
 import ReadingProgress from "./reading-progress";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: post } = await supabase
+    .from("posts")
+    .select("title, excerpt, cover_image_url, profiles!posts_author_id_fkey(name)")
+    .eq("id", id)
+    .single();
+
+  if (!post) return { title: "Story not found — Jkworld035" };
+
+  const authorName = (post.profiles as any)?.name;
+  const title = `${post.title} — Jkworld035`;
+  const description = post.excerpt;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title: post.title,
+      description,
+      type: "article",
+      ...(authorName ? { authors: [authorName] } : {}),
+      ...(post.cover_image_url ? { images: [{ url: post.cover_image_url }] } : {}),
+    },
+    twitter: {
+      card: post.cover_image_url ? "summary_large_image" : "summary",
+      title: post.title,
+      description,
+      ...(post.cover_image_url ? { images: [post.cover_image_url] } : {}),
+    },
+  };
+}
 
 export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

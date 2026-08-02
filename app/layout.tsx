@@ -18,8 +18,14 @@ const outfit = Outfit({
   display: "swap",
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
 export const metadata: Metadata = {
-  title: "Jkworld035 — Margin Notes",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Jkworld035 — Margin Notes",
+    template: "%s",
+  },
   description: "Read, write, and discover long-form essays.",
 };
 
