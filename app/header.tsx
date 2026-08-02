@@ -54,9 +54,6 @@ export default async function Header() {
             <Link href="/write" className="nav-btn">
               Write
             </Link>
-            <Link href="/earnings" className="nav-btn">
-              Earnings
-            </Link>
             {profile?.role === "admin" && (
               <Link href="/admin" className="nav-btn">
                 Admin

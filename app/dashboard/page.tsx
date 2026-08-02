@@ -91,9 +91,6 @@ export default async function DashboardPage() {
         <Link href="/write" className="btn btn-primary btn-sm">
           + Write New Story
         </Link>
-        <Link href="/earnings" className="btn btn-ghost btn-sm">
-          View Full Stats
-        </Link>
         <Link href="/profile" className="btn btn-ghost btn-sm">
           My Profile
         </Link>
