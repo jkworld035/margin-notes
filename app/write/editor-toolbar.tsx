@@ -62,6 +62,27 @@ export default function EditorToolbar({
     });
   }
 
+  function insertList(ordered: boolean) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = content.slice(start, end);
+
+    const items = selected.trim() ? selected.split("\n") : ["List item"];
+    const listText = items
+      .map((item, idx) => (ordered ? `${idx + 1}. ${item.trim() || "List item"}` : `- ${item.trim() || "List item"}`))
+      .join("\n");
+
+    const next = content.slice(0, start) + listText + content.slice(end);
+    setContent(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.selectionStart = start;
+      el.selectionEnd = start + listText.length;
+    });
+  }
+
   function handleLink() {
     const el = textareaRef.current;
     const selected = el ? content.slice(el.selectionStart, el.selectionEnd) : "";
@@ -129,6 +150,12 @@ export default function EditorToolbar({
         </button>
         <button type="button" className="btn btn-neutral btn-sm" onClick={() => prefixLine("> ")} title="Quote">
           &ldquo;&rdquo;
+        </button>
+        <button type="button" className="btn btn-neutral btn-sm" onClick={() => insertList(false)} title="Bulleted list">
+          • List
+        </button>
+        <button type="button" className="btn btn-neutral btn-sm" onClick={() => insertList(true)} title="Numbered list">
+          1. List
         </button>
         <button type="button" className="btn btn-neutral btn-sm" onClick={handleLink} title="Insert link">
           🔗 Link

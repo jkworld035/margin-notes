@@ -99,6 +99,33 @@ export function renderContent(content: string): React.ReactNode[] {
     }
 
     const lines = block.split("\n");
+
+    const bulletLines = lines.filter((l) => /^\s*[-*]\s+/.test(l));
+    if (bulletLines.length === lines.length && lines.length > 0) {
+      return (
+        <ul key={i} style={{ margin: "1rem 0", paddingLeft: "1.4rem" }}>
+          {lines.map((line, j) => (
+            <li key={j} style={{ marginBottom: ".4rem" }}>
+              {renderInline(line.replace(/^\s*[-*]\s+/, ""), `ul${i}-${j}`)}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    const numberedLines = lines.filter((l) => /^\s*\d+\.\s+/.test(l));
+    if (numberedLines.length === lines.length && lines.length > 0) {
+      return (
+        <ol key={i} style={{ margin: "1rem 0", paddingLeft: "1.4rem" }}>
+          {lines.map((line, j) => (
+            <li key={j} style={{ marginBottom: ".4rem" }}>
+              {renderInline(line.replace(/^\s*\d+\.\s+/, ""), `ol${i}-${j}`)}
+            </li>
+          ))}
+        </ol>
+      );
+    }
+
     return (
       <p key={i}>
         {lines.map((line, j) => (

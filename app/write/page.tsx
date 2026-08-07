@@ -104,7 +104,7 @@ export default function WritePage() {
           />
           <div className="form-hint">
             Supports <code>## Heading</code>, <code>&gt; Quote</code>, <code>**bold**</code>,{" "}
-            <code>*italic*</code>, links, and inline images/videos via the toolbar buttons above.
+            <code>*italic*</code>, lists, links, and inline images/videos via the toolbar buttons above.
           </div>
           <div className="char-count">
             <span>{content.length}</span>/20000
