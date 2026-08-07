@@ -10,6 +10,7 @@ create table if not exists public.profiles (
   email text not null,
   bio text not null default '',
   avatar_url text,
+  suspended boolean not null default false,
   role text not null default 'user' check (role in ('user','admin')),
   created_at timestamptz not null default now()
 );
@@ -131,6 +132,13 @@ create policy "users can update own profile"
   using (auth.uid() = id)
   with check (auth.uid() = id and role = (select role from public.profiles where id = auth.uid()));
 
+-- Profiles: admins can update any profile (for suspend / role management)
+create policy "admins can update any profile"
+  on public.profiles for update
+  to authenticated
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'))
+  with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
+
 -- Posts: anyone can read approved posts
 create policy "approved posts are public"
   on public.posts for select
@@ -152,7 +160,11 @@ create policy "admins can read all posts"
 create policy "users can insert own posts"
   on public.posts for insert
   to authenticated
-  with check (auth.uid() = author_id and status = 'approved');
+  with check (
+    auth.uid() = author_id
+    and status = 'approved'
+    and not exists (select 1 from public.profiles p where p.id = auth.uid() and p.suspended = true)
+  );
 
 -- Posts: only admins can change status (approve/reject)
 create policy "admins can update post status"
@@ -189,7 +201,10 @@ create policy "likes are publicly readable"
 create policy "users can like as themselves"
   on public.likes for insert
   to authenticated
-  with check (auth.uid() = user_id);
+  with check (
+    auth.uid() = user_id
+    and not exists (select 1 from public.profiles p where p.id = auth.uid() and p.suspended = true)
+  );
 
 create policy "users can unlike their own like"
   on public.likes for delete
@@ -222,6 +237,7 @@ create policy "authenticated users can comment"
   with check (
     auth.uid() = author_id
     and exists (select 1 from public.posts p where p.id = post_id and p.status = 'approved')
+    and not exists (select 1 from public.profiles p where p.id = auth.uid() and p.suspended = true)
   );
 
 create policy "authors or admins can delete comments"
@@ -244,7 +260,10 @@ create policy "follows are publicly readable"
 create policy "users can follow as themselves"
   on public.follows for insert
   to authenticated
-  with check (auth.uid() = follower_id);
+  with check (
+    auth.uid() = follower_id
+    and not exists (select 1 from public.profiles p where p.id = auth.uid() and p.suspended = true)
+  );
 
 create policy "users can unfollow as themselves"
   on public.follows for delete

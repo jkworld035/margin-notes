@@ -59,6 +59,13 @@ export default async function AdminPage({
       </div>
 
       <div className="admin-tabs">
+        <span className="admin-tab active">Posts</span>
+        <Link href="/admin/members" className="admin-tab">
+          Members
+        </Link>
+      </div>
+
+      <div className="admin-tabs">
         <Link href="/admin?tab=published" className={`admin-tab${tab === "published" ? " active" : ""}`}>
           Published
         </Link>
