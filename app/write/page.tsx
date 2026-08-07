@@ -58,6 +58,12 @@ export default function WritePage() {
               <option value="Design">Design</option>
               <option value="Technology">Technology</option>
               <option value="Culture">Culture</option>
+              <option value="Business">Business</option>
+              <option value="Health">Health</option>
+              <option value="Travel">Travel</option>
+              <option value="Lifestyle">Lifestyle</option>
+              <option value="Science">Science</option>
+              <option value="Education">Education</option>
             </select>
           </div>
           <div className="form-group">

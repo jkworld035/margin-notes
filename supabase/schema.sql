@@ -24,7 +24,7 @@ create table if not exists public.posts (
   content text not null,
   cover_image_url text,
   tags text[] not null default '{}',
-  category text not null default 'Essays' check (category in ('Essays','Design','Technology','Culture')),
+  category text not null default 'Essays' check (category in ('Essays','Design','Technology','Culture','Business','Health','Travel','Lifestyle','Science','Education')),
   author_id uuid not null references public.profiles(id) on delete cascade,
   status text not null default 'approved' check (status in ('approved','rejected')),
   created_at timestamptz not null default now()

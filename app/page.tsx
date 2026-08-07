@@ -2,7 +2,19 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { estimateReadTime } from "./actions/posts";
 
-const CATEGORIES = ["All", "Design", "Technology", "Culture", "Essays"];
+const CATEGORIES = [
+  "All",
+  "Essays",
+  "Design",
+  "Technology",
+  "Culture",
+  "Business",
+  "Health",
+  "Travel",
+  "Lifestyle",
+  "Science",
+  "Education",
+];
 
 export default async function HomePage({
   searchParams,
