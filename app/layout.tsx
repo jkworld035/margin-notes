@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Lora, Outfit } from "next/font/google";
 import "./globals.css";
 import Header from "./header";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import ServiceWorkerRegister from "./service-worker-register";
 
 const lora = Lora({
   subsets: ["latin"],
@@ -27,6 +30,16 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description: "Read, write, and discover long-form essays.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Jkworld035",
+  },
+};
+
+export const viewport = {
+  themeColor: "#d4522a",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -38,10 +51,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `try{var t=localStorage.getItem('marginNotesTheme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}`,
           }}
         />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
       <body>
         <Header />
         {children}
+        <Analytics />
+        <SpeedInsights />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
