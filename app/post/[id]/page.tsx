@@ -25,10 +25,10 @@ export async function generateMetadata({
     .eq("id", id)
     .single();
 
-  if (!post) return { title: "Story not found — Jkworld035" };
+  if (!post) return { title: "Story not found — Margin Notes" };
 
   const authorName = (post.profiles as any)?.name;
-  const title = `${post.title} — Jkworld035`;
+  const title = `${post.title} — Margin Notes`;
   const description = post.excerpt;
 
   return {

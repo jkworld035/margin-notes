@@ -26,7 +26,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Jkworld035 — Margin Notes",
+    default: "Margin Notes",
     template: "%s",
   },
   description: "Read, write, and discover long-form essays.",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Jkworld035",
+    title: "Margin Notes",
   },
 };
 
@@ -52,7 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         <link rel="apple-touch-icon" href="/icon-192.png" />
-        <link rel="alternate" type="application/rss+xml" title="Jkworld035 — Margin Notes" href="/rss.xml" />
+        <link rel="alternate" type="application/rss+xml" title="Margin Notes" href="/rss.xml" />
       </head>
       <body>
         <Header />

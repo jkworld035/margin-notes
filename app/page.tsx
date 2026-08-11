@@ -130,7 +130,7 @@ export default async function HomePage({
   return (
     <div>
       <div className="hero">
-        <span className="hero-eyebrow">Welcome to Jkworld035</span>
+        <span className="hero-eyebrow">Welcome to Margin Notes</span>
         <h1>
           Stories worth
           <br />

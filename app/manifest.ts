@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Jkworld035 — Margin Notes",
-    short_name: "Jkworld035",
+    name: "Margin Notes",
+    short_name: "Margin Notes",
     description: "Read, write, and discover long-form essays.",
     start_url: "/",
     display: "standalone",

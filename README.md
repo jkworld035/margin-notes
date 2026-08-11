@@ -1,4 +1,4 @@
-# Margin Notes (Jkworld035)
+# Margin Notes
 
 A full-featured publishing platform — real accounts, instant publishing, a social layer (claps, comments, bookmarks, follows, notifications), search, tags, trending, dark mode, and a stats dashboard — built with **Next.js** (App Router) and **Supabase** (Postgres + Auth + Row-Level Security + Storage).
 

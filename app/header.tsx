@@ -30,7 +30,7 @@ export default async function Header() {
   return (
     <header>
       <Link href="/" className="logo">
-        Jkworld<span>035</span>
+        Margin<span> Notes</span>
       </Link>
       <form action="/" method="get" className="header-search">
         <input type="text" name="q" placeholder="Search stories, tags…" />

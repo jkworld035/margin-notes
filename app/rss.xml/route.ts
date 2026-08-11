@@ -39,7 +39,7 @@ export async function GET() {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
-    <title>Jkworld035 — Margin Notes</title>
+    <title>Margin Notes</title>
     <link>${siteUrl}</link>
     <description>Read, write, and discover long-form essays.</description>${items}
   </channel>

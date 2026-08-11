@@ -14,15 +14,15 @@ export async function generateMetadata({
   const supabase = await createClient();
   const { data: author } = await supabase.from("profiles").select("name, bio").eq("id", id).single();
 
-  if (!author) return { title: "Author not found — Jkworld035" };
+  if (!author) return { title: "Author not found — Margin Notes" };
 
-  const description = author.bio || `Read stories by ${author.name} on Jkworld035.`;
+  const description = author.bio || `Read stories by ${author.name} on Margin Notes.`;
 
   return {
-    title: `${author.name} — Jkworld035`,
+    title: `${author.name} — Margin Notes`,
     description,
     openGraph: {
-      title: `${author.name} on Jkworld035`,
+      title: `${author.name} on Margin Notes`,
       description,
       type: "profile",
     },
