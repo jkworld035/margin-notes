@@ -7,6 +7,7 @@ import { renderContent } from "@/lib/render-content";
 import LikeButton from "./like-button";
 import BookmarkButton from "./bookmark-button";
 import ShareButton from "./share-button";
+import ReportButton from "./report-button";
 import Comments from "./comments";
 import ViewTracker from "./view-tracker";
 import ReadingProgress from "./reading-progress";
@@ -75,7 +76,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         : Promise.resolve({ data: null }),
       supabase
         .from("comments")
-        .select("id, content, created_at, author_id, profiles(name)")
+        .select("id, content, created_at, author_id, parent_id, profiles(name)")
         .eq("post_id", id)
         .order("created_at", { ascending: true }),
       user
@@ -143,6 +144,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
               Edit
             </Link>
           )}
+          {user && user.id !== post.author_id && <ReportButton postId={post.id} />}
         </div>
 
         <Comments

@@ -42,3 +42,37 @@ export async function toggleAdminRole(targetUserId: string, makeAdmin: boolean) 
   revalidatePath("/admin/members");
   return { success: true };
 }
+
+export async function resolveReport(reportId: string, status: "resolved" | "dismissed") {
+  const { supabase, ok } = await requireAdmin();
+  if (!ok) return { error: "Admins only." };
+
+  const { error } = await supabase.from("reports").update({ status }).eq("id", reportId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/reports");
+  return { success: true };
+}
+
+export async function adminDeletePost(postId: string) {
+  const { supabase, ok } = await requireAdmin();
+  if (!ok) return { error: "Admins only." };
+
+  const { error } = await supabase.from("posts").delete().eq("id", postId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/reports");
+  revalidatePath("/");
+  return { success: true };
+}
+
+export async function adminDeleteComment(commentId: string) {
+  const { supabase, ok } = await requireAdmin();
+  if (!ok) return { error: "Admins only." };
+
+  const { error } = await supabase.from("comments").delete().eq("id", commentId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/reports");
+  return { success: true };
+}

@@ -26,7 +26,8 @@ create table if not exists public.posts (
   tags text[] not null default '{}',
   category text not null default 'Essays' check (category in ('Essays','Design','Technology','Culture','Business','Health','Travel','Lifestyle','Science','Education')),
   author_id uuid not null references public.profiles(id) on delete cascade,
-  status text not null default 'approved' check (status in ('approved','rejected')),
+  status text not null default 'approved' check (status in ('approved','rejected','draft')),
+  scheduled_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -56,12 +57,25 @@ create table if not exists public.notifications (
   id uuid primary key default gen_random_uuid(),
   recipient_id uuid not null references public.profiles(id) on delete cascade,
   actor_id uuid not null references public.profiles(id) on delete cascade,
-  type text not null check (type in ('follow','like','comment')),
+  type text not null check (type in ('follow','like','comment','reply')),
   post_id uuid references public.posts(id) on delete cascade,
   read boolean not null default false,
   created_at timestamptz not null default now()
 );
 create index if not exists notifications_recipient_idx on public.notifications(recipient_id, created_at desc);
+
+-- Reports (content moderation queue)
+create table if not exists public.reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter_id uuid not null references public.profiles(id) on delete cascade,
+  post_id uuid references public.posts(id) on delete cascade,
+  comment_id uuid references public.comments(id) on delete cascade,
+  reason text not null,
+  status text not null default 'open' check (status in ('open','resolved','dismissed')),
+  created_at timestamptz not null default now(),
+  check (post_id is not null or comment_id is not null)
+);
+create index if not exists reports_status_idx on public.reports(status);
 
 -- Likes
 create table if not exists public.likes (
@@ -76,10 +90,12 @@ create table if not exists public.comments (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.posts(id) on delete cascade,
   author_id uuid not null references public.profiles(id) on delete cascade,
+  parent_id uuid references public.comments(id) on delete cascade,
   content text not null,
   created_at timestamptz not null default now()
 );
 create index if not exists comments_post_idx on public.comments(post_id);
+create index if not exists comments_parent_idx on public.comments(parent_id);
 
 -- Follows: follower_id follows following_id
 create table if not exists public.follows (
@@ -139,10 +155,10 @@ create policy "admins can update any profile"
   using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'))
   with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
 
--- Posts: anyone can read approved posts
+-- Posts: anyone can read approved posts once their scheduled time (if any) has passed
 create policy "approved posts are public"
   on public.posts for select
-  using (status = 'approved');
+  using (status = 'approved' and (scheduled_at is null or scheduled_at <= now()));
 
 -- Posts: authors can read their own posts regardless of status
 create policy "authors can read own posts"
@@ -156,13 +172,13 @@ create policy "admins can read all posts"
   to authenticated
   using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
 
--- Posts: authenticated users can create a post as themselves, published immediately
+-- Posts: authenticated users can create a post as themselves — published, scheduled, or as a draft
 create policy "users can insert own posts"
   on public.posts for insert
   to authenticated
   with check (
     auth.uid() = author_id
-    and status = 'approved'
+    and status in ('approved', 'draft')
     and not exists (select 1 from public.profiles p where p.id = auth.uid() and p.suspended = true)
   );
 
@@ -325,6 +341,32 @@ create policy "users can mark own notifications read"
   with check (auth.uid() = recipient_id);
 
 -- ============================================================
+-- ============================================================
+-- Reports
+-- ============================================================
+alter table public.reports enable row level security;
+
+create policy "users can create reports"
+  on public.reports for insert
+  to authenticated
+  with check (auth.uid() = reporter_id);
+
+create policy "admins can read all reports"
+  on public.reports for select
+  to authenticated
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
+
+create policy "reporters can read own reports"
+  on public.reports for select
+  to authenticated
+  using (auth.uid() = reporter_id);
+
+create policy "admins can update reports"
+  on public.reports for update
+  to authenticated
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'))
+  with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
+
 -- Optional: promote your first user to admin after they sign up
 -- Run this manually once, replacing the email:
 -- update public.profiles set role = 'admin' where email = 'you@example.com';

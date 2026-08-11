@@ -14,7 +14,9 @@ export default function EditPostPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
+  const [currentStatus, setCurrentStatus] = useState<string>("approved");
+  const [showSchedule, setShowSchedule] = useState(false);
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -24,6 +26,7 @@ export default function EditPostPage() {
   const [content, setContent] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     async function load() {
@@ -38,7 +41,7 @@ export default function EditPostPage() {
       }
       const { data: post } = await supabase
         .from("posts")
-        .select("title, subtitle, category, tags, excerpt, content, cover_image_url, author_id")
+        .select("title, subtitle, category, tags, excerpt, content, cover_image_url, author_id, status")
         .eq("id", postId)
         .single();
 
@@ -55,18 +58,26 @@ export default function EditPostPage() {
       setExcerpt(post.excerpt);
       setContent(post.content);
       setCoverImageUrl(post.cover_image_url || "");
+      setCurrentStatus(post.status);
       setLoading(false);
     }
     load();
   }, [postId]);
 
-  async function action(formData: FormData) {
-    setPending(true);
+  async function submitWithMode(mode: "" | "publish" | "draft" | "schedule") {
+    if (!formRef.current) return;
+    if (mode === "schedule" && !showSchedule) {
+      setShowSchedule(true);
+      return;
+    }
+    setPending(mode || "save");
     setError(null);
+    const formData = new FormData(formRef.current);
+    formData.set("mode", mode);
     const res = await updatePost(postId, formData);
     if (res?.error) {
       setError(res.error);
-      setPending(false);
+      setPending(null);
     }
   }
 
@@ -76,9 +87,17 @@ export default function EditPostPage() {
   return (
     <div className="write-page">
       <h2>Edit Story</h2>
-      <p className="sub">Changes go live immediately once saved.</p>
+      <p className="sub">
+        {currentStatus === "draft" ? "This is a draft — only you can see it." : "Changes go live immediately once saved."}
+      </p>
       {error && <div className="form-error">{error}</div>}
-      <form action={action}>
+      <form
+        ref={formRef}
+        onSubmit={(e) => {
+          e.preventDefault();
+          submitWithMode("");
+        }}
+      >
         <div className="form-group">
           <label>Title</label>
           <input
@@ -151,9 +170,55 @@ export default function EditPostPage() {
             required
           />
         </div>
-        <button className="btn btn-primary" type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save Changes"}
-        </button>
+
+        {showSchedule && (
+          <div className="form-group">
+            <label>Schedule for</label>
+            <input name="scheduledAt" type="datetime-local" />
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: ".6rem", flexWrap: "wrap" }}>
+          <button
+            className="btn btn-primary"
+            type="submit"
+            disabled={pending !== null}
+            onClick={(e) => {
+              e.preventDefault();
+              submitWithMode("");
+            }}
+          >
+            {pending === "save" ? "Saving…" : "Save Changes"}
+          </button>
+          {currentStatus === "draft" && (
+            <button
+              className="btn btn-neutral"
+              type="button"
+              disabled={pending !== null}
+              onClick={() => submitWithMode("publish")}
+            >
+              {pending === "publish" ? "Publishing…" : "Publish Now"}
+            </button>
+          )}
+          {currentStatus !== "draft" && (
+            <button
+              className="btn btn-neutral"
+              type="button"
+              disabled={pending !== null}
+              onClick={() => submitWithMode("draft")}
+            >
+              {pending === "draft" ? "Saving…" : "Move to Draft"}
+            </button>
+          )}
+          <button
+            className="btn btn-ghost"
+            type="button"
+            disabled={pending !== null}
+            onClick={() => submitWithMode("schedule")}
+          >
+            {pending === "schedule" ? "Scheduling…" : showSchedule ? "Confirm Schedule" : "Reschedule"}
+          </button>
+        </div>
       </form>
     </div>
   );

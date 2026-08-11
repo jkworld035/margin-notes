@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { signIn } from "@/app/actions/auth";
+import GoogleSignInButton from "@/app/google-sign-in-button";
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export default function LoginPage() {
             {pending ? "Logging in…" : "Log In"}
           </button>
         </form>
+        <GoogleSignInButton />
         <div className="auth-switch">
           New here? <Link href="/signup">Create an account</Link>
         </div>

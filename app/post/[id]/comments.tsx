@@ -3,14 +3,134 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { addComment, deleteComment } from "@/app/actions/social";
+import ReportButton from "./report-button";
 
 type Comment = {
   id: string;
   content: string;
   created_at: string;
   author_id: string;
+  parent_id: string | null;
   profiles: { name: string } | null;
 };
+
+function buildTree(comments: Comment[]) {
+  const byParent: Record<string, Comment[]> = {};
+  comments.forEach((c) => {
+    const key = c.parent_id || "root";
+    if (!byParent[key]) byParent[key] = [];
+    byParent[key].push(c);
+  });
+  return byParent;
+}
+
+function CommentItem({
+  comment,
+  byParent,
+  postId,
+  currentUserId,
+  isLoggedIn,
+  isPending,
+  startTransition,
+  onDeleted,
+  depth,
+}: {
+  comment: Comment;
+  byParent: Record<string, Comment[]>;
+  postId: string;
+  currentUserId: string | null;
+  isLoggedIn: boolean;
+  isPending: boolean;
+  startTransition: React.TransitionStartFunction;
+  onDeleted: (id: string) => void;
+  depth: number;
+}) {
+  const [replying, setReplying] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const replies = byParent[comment.id] || [];
+
+  async function handleReply(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const res = await addComment(postId, replyText, comment.id);
+    if (res?.error) {
+      setError(res.error);
+      return;
+    }
+    setReplying(false);
+    setReplyText("");
+    window.location.reload();
+  }
+
+  return (
+    <div style={{ marginLeft: depth > 0 ? "1.6rem" : 0 }}>
+      <div style={{ borderBottom: "1px solid var(--rule)", paddingBottom: "1rem", marginBottom: "1rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <span style={{ fontWeight: 500, fontSize: ".9rem" }}>{comment.profiles?.name || "Someone"}</span>
+          <span style={{ color: "var(--muted)", fontSize: ".75rem" }}>
+            {new Date(comment.created_at).toLocaleDateString()}
+          </span>
+        </div>
+        <p style={{ fontSize: ".92rem", marginTop: ".3rem", fontWeight: 300 }}>{comment.content}</p>
+        <div style={{ display: "flex", gap: ".4rem", marginTop: ".4rem" }}>
+          {isLoggedIn && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setReplying((r) => !r)}>
+              Reply
+            </button>
+          )}
+          {comment.author_id === currentUserId && (
+            <button
+              className="btn btn-ghost btn-sm"
+              disabled={isPending}
+              onClick={() => {
+                onDeleted(comment.id);
+                startTransition(() => {
+                  deleteComment(comment.id, postId);
+                });
+              }}
+            >
+              Delete
+            </button>
+          )}
+          <ReportButton commentId={comment.id} />
+        </div>
+
+        {replying && (
+          <form onSubmit={handleReply} style={{ marginTop: ".8rem" }}>
+            {error && <div className="form-error">{error}</div>}
+            <textarea
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              placeholder="Write a reply…"
+              maxLength={1000}
+              style={{ minHeight: "60px" }}
+              required
+            />
+            <button className="btn btn-primary btn-sm" type="submit" style={{ marginTop: ".4rem" }}>
+              Post Reply
+            </button>
+          </form>
+        )}
+      </div>
+
+      {replies.map((r) => (
+        <CommentItem
+          key={r.id}
+          comment={r}
+          byParent={byParent}
+          postId={postId}
+          currentUserId={currentUserId}
+          isLoggedIn={isLoggedIn}
+          isPending={isPending}
+          startTransition={startTransition}
+          onDeleted={onDeleted}
+          depth={depth + 1}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function Comments({
   postId,
@@ -37,9 +157,15 @@ export default function Comments({
       return;
     }
     setText("");
-    // optimistic-ish: just refresh via a temp local entry; the revalidated page data will reconcile on next nav
     window.location.reload();
   }
+
+  function onDeleted(id: string) {
+    setComments((cs) => cs.filter((x) => x.id !== id && x.parent_id !== id));
+  }
+
+  const byParent = buildTree(comments);
+  const topLevel = byParent["root"] || [];
 
   return (
     <div style={{ marginTop: "3rem", borderTop: "1px solid var(--rule)", paddingTop: "2rem" }}>
@@ -73,32 +199,20 @@ export default function Comments({
         </p>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}>
-        {comments.map((c) => (
-          <div key={c.id} style={{ borderBottom: "1px solid var(--rule)", paddingBottom: "1.2rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <span style={{ fontWeight: 500, fontSize: ".9rem" }}>{c.profiles?.name || "Someone"}</span>
-              <span style={{ color: "var(--muted)", fontSize: ".75rem" }}>
-                {new Date(c.created_at).toLocaleDateString()}
-              </span>
-            </div>
-            <p style={{ fontSize: ".92rem", marginTop: ".3rem", fontWeight: 300 }}>{c.content}</p>
-            {c.author_id === currentUserId && (
-              <button
-                className="btn btn-ghost btn-sm"
-                style={{ marginTop: ".4rem" }}
-                disabled={isPending}
-                onClick={() => {
-                  setComments((cs) => cs.filter((x) => x.id !== c.id));
-                  startTransition(() => {
-                    deleteComment(c.id, postId);
-                  });
-                }}
-              >
-                Delete
-              </button>
-            )}
-          </div>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {topLevel.map((c) => (
+          <CommentItem
+            key={c.id}
+            comment={c}
+            byParent={byParent}
+            postId={postId}
+            currentUserId={currentUserId}
+            isLoggedIn={isLoggedIn}
+            isPending={isPending}
+            startTransition={startTransition}
+            onDeleted={onDeleted}
+            depth={0}
+          />
         ))}
       </div>
     </div>

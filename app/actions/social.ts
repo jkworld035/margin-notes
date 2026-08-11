@@ -37,7 +37,7 @@ export async function toggleLike(postId: string) {
   return { liked: !existing };
 }
 
-export async function addComment(postId: string, content: string) {
+export async function addComment(postId: string, content: string, parentId?: string | null) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -52,18 +52,31 @@ export async function addComment(postId: string, content: string) {
     post_id: postId,
     author_id: user.id,
     content: trimmed,
+    parent_id: parentId || null,
   });
 
   if (error) return { error: error.message };
 
-  const { data: post } = await supabase.from("posts").select("author_id").eq("id", postId).single();
-  if (post && post.author_id !== user.id) {
-    await supabase.from("notifications").insert({
-      recipient_id: post.author_id,
-      actor_id: user.id,
-      type: "comment",
-      post_id: postId,
-    });
+  if (parentId) {
+    const { data: parent } = await supabase.from("comments").select("author_id").eq("id", parentId).single();
+    if (parent && parent.author_id !== user.id) {
+      await supabase.from("notifications").insert({
+        recipient_id: parent.author_id,
+        actor_id: user.id,
+        type: "reply",
+        post_id: postId,
+      });
+    }
+  } else {
+    const { data: post } = await supabase.from("posts").select("author_id").eq("id", postId).single();
+    if (post && post.author_id !== user.id) {
+      await supabase.from("notifications").insert({
+        recipient_id: post.author_id,
+        actor_id: user.id,
+        type: "comment",
+        post_id: postId,
+      });
+    }
   }
 
   revalidatePath(`/post/${postId}`);
@@ -147,4 +160,34 @@ export async function markAllNotificationsRead() {
   if (!user) return;
   await supabase.from("notifications").update({ read: true }).eq("recipient_id", user.id).eq("read", false);
   revalidatePath("/notifications");
+}
+
+export async function reportContent({
+  postId,
+  commentId,
+  reason,
+}: {
+  postId?: string;
+  commentId?: string;
+  reason: string;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in to report content." };
+
+  const trimmed = reason.trim();
+  if (!trimmed) return { error: "Please describe the issue." };
+  if (!postId && !commentId) return { error: "Nothing to report." };
+
+  const { error } = await supabase.from("reports").insert({
+    reporter_id: user.id,
+    post_id: postId || null,
+    comment_id: commentId || null,
+    reason: trimmed,
+  });
+
+  if (error) return { error: error.message };
+  return { success: true };
 }

@@ -52,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="alternate" type="application/rss+xml" title="Jkworld035 — Margin Notes" href="/rss.xml" />
       </head>
       <body>
         <Header />

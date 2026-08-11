@@ -25,6 +25,8 @@ export async function submitPost(formData: FormData) {
   const category = String(formData.get("category") || "Essays");
   const coverImageUrl = String(formData.get("coverImageUrl") || "").trim();
   const tagsRaw = String(formData.get("tags") || "");
+  const mode = String(formData.get("mode") || "publish"); // "publish" | "draft" | "schedule"
+  const scheduledAtRaw = String(formData.get("scheduledAt") || "").trim();
   const tags = tagsRaw
     .split(",")
     .map((t) => t.trim().toLowerCase())
@@ -33,6 +35,21 @@ export async function submitPost(formData: FormData) {
 
   if (!title || !excerpt || !content) {
     return { error: "Title, excerpt, and content are all required." };
+  }
+
+  let status: "approved" | "draft" = "approved";
+  let scheduledAt: string | null = null;
+
+  if (mode === "draft") {
+    status = "draft";
+  } else if (mode === "schedule") {
+    if (!scheduledAtRaw) return { error: "Pick a date and time to schedule for." };
+    const when = new Date(scheduledAtRaw);
+    if (isNaN(when.getTime()) || when.getTime() <= Date.now()) {
+      return { error: "Scheduled time must be in the future." };
+    }
+    status = "approved";
+    scheduledAt = when.toISOString();
   }
 
   const { data: inserted, error } = await supabase
@@ -45,7 +62,8 @@ export async function submitPost(formData: FormData) {
       category,
       tags,
       author_id: user.id,
-      status: "approved",
+      status,
+      scheduled_at: scheduledAt,
       cover_image_url: coverImageUrl || null,
     })
     .select("id")
@@ -55,6 +73,9 @@ export async function submitPost(formData: FormData) {
 
   revalidatePath("/profile");
   revalidatePath("/");
+  if (status === "draft") {
+    redirect("/profile?tab=drafts");
+  }
   redirect(`/post/${inserted.id}`);
 }
 
@@ -72,6 +93,8 @@ export async function updatePost(postId: string, formData: FormData) {
   const category = String(formData.get("category") || "Essays");
   const coverImageUrl = String(formData.get("coverImageUrl") || "").trim();
   const tagsRaw = String(formData.get("tags") || "");
+  const mode = String(formData.get("mode") || ""); // "publish" | "draft" | "schedule" | "" (no status change)
+  const scheduledAtRaw = String(formData.get("scheduledAt") || "").trim();
   const tags = tagsRaw
     .split(",")
     .map((t) => t.trim().toLowerCase())
@@ -82,25 +105,42 @@ export async function updatePost(postId: string, formData: FormData) {
     return { error: "Title, excerpt, and content are all required." };
   }
 
-  const { error } = await supabase
-    .from("posts")
-    .update({
-      title,
-      subtitle: subtitle || null,
-      excerpt,
-      content,
-      category,
-      tags,
-      cover_image_url: coverImageUrl || null,
-    })
-    .eq("id", postId)
-    .eq("author_id", user.id);
+  const update: Record<string, unknown> = {
+    title,
+    subtitle: subtitle || null,
+    excerpt,
+    content,
+    category,
+    tags,
+    cover_image_url: coverImageUrl || null,
+  };
+
+  if (mode === "draft") {
+    update.status = "draft";
+    update.scheduled_at = null;
+  } else if (mode === "publish") {
+    update.status = "approved";
+    update.scheduled_at = null;
+  } else if (mode === "schedule") {
+    if (!scheduledAtRaw) return { error: "Pick a date and time to schedule for." };
+    const when = new Date(scheduledAtRaw);
+    if (isNaN(when.getTime()) || when.getTime() <= Date.now()) {
+      return { error: "Scheduled time must be in the future." };
+    }
+    update.status = "approved";
+    update.scheduled_at = when.toISOString();
+  }
+
+  const { error } = await supabase.from("posts").update(update).eq("id", postId).eq("author_id", user.id);
 
   if (error) return { error: error.message };
 
   revalidatePath(`/post/${postId}`);
   revalidatePath("/profile");
   revalidatePath("/");
+  if (update.status === "draft") {
+    redirect("/profile?tab=drafts");
+  }
   redirect(`/post/${postId}`);
 }
 
