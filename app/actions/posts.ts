@@ -163,4 +163,59 @@ export async function deletePost(postId: string) {
   revalidatePath("/");
 }
 
+export async function addCoAuthor(postId: string, email: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const { data: post } = await supabase.from("posts").select("author_id, co_author_ids").eq("id", postId).single();
+  if (!post) return { error: "Story not found." };
+  if (post.author_id !== user.id) return { error: "Only the primary author can add collaborators." };
+
+  const trimmedEmail = email.trim().toLowerCase();
+  if (!trimmedEmail) return { error: "Enter an email address." };
+
+  const { data: collaborator } = await supabase
+    .from("profiles")
+    .select("id, name")
+    .ilike("email", trimmedEmail)
+    .maybeSingle();
+
+  if (!collaborator) return { error: "No user found with that email." };
+  if (collaborator.id === user.id) return { error: "You're already the author." };
+  if ((post.co_author_ids || []).includes(collaborator.id)) {
+    return { error: `${collaborator.name} is already a collaborator.` };
+  }
+
+  const nextCoAuthors = [...(post.co_author_ids || []), collaborator.id];
+  const { error } = await supabase.from("posts").update({ co_author_ids: nextCoAuthors }).eq("id", postId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/write/${postId}`);
+  revalidatePath(`/post/${postId}`);
+  return { success: true, name: collaborator.name };
+}
+
+export async function removeCoAuthor(postId: string, coAuthorId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const { data: post } = await supabase.from("posts").select("author_id, co_author_ids").eq("id", postId).single();
+  if (!post) return { error: "Story not found." };
+  if (post.author_id !== user.id) return { error: "Only the primary author can remove collaborators." };
+
+  const nextCoAuthors = (post.co_author_ids || []).filter((id: string) => id !== coAuthorId);
+  const { error } = await supabase.from("posts").update({ co_author_ids: nextCoAuthors }).eq("id", postId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/write/${postId}`);
+  revalidatePath(`/post/${postId}`);
+  return { success: true };
+}
+
 export { estimateReadTime };

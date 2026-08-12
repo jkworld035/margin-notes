@@ -28,8 +28,8 @@ export default async function ProfilePage({
 
   const { data: allMyPosts } = await supabase
     .from("posts")
-    .select("id, title, excerpt, category, status, created_at, scheduled_at")
-    .eq("author_id", user.id)
+    .select("id, title, excerpt, category, status, created_at, scheduled_at, author_id")
+    .or(`author_id.eq.${user.id},co_author_ids.cs.{${user.id}}`)
     .order("created_at", { ascending: false });
 
   const myPosts = (allMyPosts || []).filter((p) => p.status !== "draft");

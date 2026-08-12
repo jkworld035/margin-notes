@@ -46,6 +46,88 @@ function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
   });
 }
 
+function parseTable(lines: string[]): { header: string[]; rows: string[][] } | null {
+  if (lines.length < 2) return null;
+  const isRow = (l: string) => /^\s*\|.*\|\s*$/.test(l);
+  const isSeparator = (l: string) => /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/.test(l);
+
+  if (!isRow(lines[0]) || !isSeparator(lines[1])) return null;
+
+  const splitRow = (l: string) =>
+    l
+      .trim()
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((c) => c.trim());
+
+  const header = splitRow(lines[0]);
+  const rows = lines.slice(2).filter((l) => isRow(l)).map(splitRow);
+  if (rows.length === 0 && lines.length > 2) return null; // malformed, fall through to paragraph
+
+  return { header, rows };
+}
+
+const CODE_KEYWORDS =
+  /\b(function|const|let|var|return|if|else|for|while|import|export|from|class|def|print|public|static|void|int|new|this|async|await|try|catch|null|true|false|None|True|False)\b/g;
+
+function highlightCode(code: string): React.ReactNode[] {
+  const lines = code.split("\n");
+  return lines.map((line, i) => {
+    const tokens: React.ReactNode[] = [];
+    let rest = line;
+    let key = 0;
+
+    // comments (rest of line)
+    const commentMatch = rest.match(/(\/\/.*$|#.*$)/);
+    let trailingComment = "";
+    if (commentMatch && commentMatch.index !== undefined) {
+      trailingComment = rest.slice(commentMatch.index);
+      rest = rest.slice(0, commentMatch.index);
+    }
+
+    // strings
+    const parts = rest.split(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g);
+    parts.forEach((part) => {
+      if (/^["'].*["']$/.test(part)) {
+        tokens.push(
+          <span key={key++} style={{ color: "#c9a876" }}>
+            {part}
+          </span>
+        );
+        return;
+      }
+      const subParts = part.split(CODE_KEYWORDS);
+      subParts.forEach((sub, si) => {
+        if (si % 2 === 1) {
+          tokens.push(
+            <span key={key++} style={{ color: "#e26a42" }}>
+              {sub}
+            </span>
+          );
+        } else if (sub) {
+          tokens.push(<React.Fragment key={key++}>{sub}</React.Fragment>);
+        }
+      });
+    });
+
+    if (trailingComment) {
+      tokens.push(
+        <span key={key++} style={{ color: "#8a8680" }}>
+          {trailingComment}
+        </span>
+      );
+    }
+
+    return (
+      <React.Fragment key={i}>
+        {tokens}
+        {i < lines.length - 1 && "\n"}
+      </React.Fragment>
+    );
+  });
+}
+
 export function renderContent(content: string): React.ReactNode[] {
   const blocks = content.split(/\n\s*\n/).filter((b) => b.trim());
 
@@ -103,6 +185,78 @@ export function renderContent(content: string): React.ReactNode[] {
     }
 
     const lines = block.split("\n");
+
+    const codeMatch = trimmed.match(/^```([a-zA-Z0-9+#-]*)\n([\s\S]*?)\n?```$/);
+    if (codeMatch) {
+      const [, lang, code] = codeMatch;
+      return (
+        <div key={i} style={{ margin: "1.5rem 0" }}>
+          {lang && (
+            <div
+              style={{
+                fontSize: ".7rem",
+                letterSpacing: ".08em",
+                textTransform: "uppercase",
+                color: "var(--muted)",
+                marginBottom: ".3rem",
+              }}
+            >
+              {lang}
+            </div>
+          )}
+          <pre
+            style={{
+              background: "var(--ink)",
+              color: "#e8e4de",
+              padding: "1.2rem",
+              borderRadius: "4px",
+              overflowX: "auto",
+              fontSize: ".85rem",
+              lineHeight: 1.6,
+            }}
+          >
+            <code style={{ fontFamily: "monospace" }}>{highlightCode(code)}</code>
+          </pre>
+        </div>
+      );
+    }
+
+    const tableMatch = parseTable(lines);
+    if (tableMatch) {
+      return (
+        <table key={i} style={{ width: "100%", borderCollapse: "collapse", margin: "1.5rem 0" }}>
+          <thead>
+            <tr>
+              {tableMatch.header.map((cell, ci) => (
+                <th
+                  key={ci}
+                  style={{
+                    textAlign: "left",
+                    borderBottom: "2px solid var(--rule)",
+                    padding: ".5rem .7rem",
+                    fontFamily: "var(--serif)",
+                    fontWeight: 600,
+                  }}
+                >
+                  {renderInline(cell, `th${i}-${ci}`)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tableMatch.rows.map((row, ri) => (
+              <tr key={ri}>
+                {row.map((cell, ci) => (
+                  <td key={ci} style={{ borderBottom: "1px solid var(--rule)", padding: ".5rem .7rem" }}>
+                    {renderInline(cell, `td${i}-${ri}-${ci}`)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
 
     const bulletLines = lines.filter((l) => /^\s*[-*]\s+/.test(l));
     if (bulletLines.length === lines.length && lines.length > 0) {

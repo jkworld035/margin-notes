@@ -27,6 +27,7 @@ create table if not exists public.posts (
   category text not null default 'Essays' check (category in ('Essays','Design','Technology','Culture','Business','Health','Travel','Lifestyle','Science','Education')),
   author_id uuid not null references public.profiles(id) on delete cascade,
   status text not null default 'approved' check (status in ('approved','rejected','draft')),
+  co_author_ids uuid[] not null default '{}',
   scheduled_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -160,11 +161,11 @@ create policy "approved posts are public"
   on public.posts for select
   using (status = 'approved' and (scheduled_at is null or scheduled_at <= now()));
 
--- Posts: authors can read their own posts regardless of status
+-- Posts: authors and co-authors can read their own posts regardless of status
 create policy "authors can read own posts"
   on public.posts for select
   to authenticated
-  using (auth.uid() = author_id);
+  using (auth.uid() = author_id or auth.uid() = any(co_author_ids));
 
 -- Posts: admins can read every post
 create policy "admins can read all posts"
@@ -189,12 +190,12 @@ create policy "admins can update post status"
   using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'))
   with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
 
--- Posts: authors can edit their own posts
+-- Posts: authors and co-authors can edit the post
 create policy "authors can update own posts"
   on public.posts for update
   to authenticated
-  using (auth.uid() = author_id)
-  with check (auth.uid() = author_id);
+  using (auth.uid() = author_id or auth.uid() = any(co_author_ids))
+  with check (auth.uid() = author_id or auth.uid() = any(co_author_ids));
 
 -- Posts: admins can delete any post, authors can delete their own
 create policy "admins or owners can delete posts"

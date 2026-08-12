@@ -57,12 +57,17 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   const { data: post } = await supabase
     .from("posts")
     .select(
-      "id, title, subtitle, excerpt, content, category, tags, created_at, status, cover_image_url, author_id, profiles!posts_author_id_fkey(name)"
+      "id, title, subtitle, excerpt, content, category, tags, created_at, status, cover_image_url, author_id, co_author_ids, profiles!posts_author_id_fkey(name)"
     )
     .eq("id", id)
     .single();
 
   if (!post) notFound();
+
+  const { data: coAuthors } =
+    post.co_author_ids && post.co_author_ids.length > 0
+      ? await supabase.from("profiles").select("name").in("id", post.co_author_ids)
+      : { data: [] };
 
   const {
     data: { user },
@@ -100,6 +105,9 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           <Link href={`/author/${post.author_id}`} style={{ color: "inherit", textDecoration: "none" }}>
             {(post.profiles as any)?.name}
           </Link>
+          {coAuthors && coAuthors.length > 0 && (
+            <span> &amp; {coAuthors.map((c: any) => c.name).join(", ")}</span>
+          )}
           <span className="meta-dot">·</span>
           <span>{new Date(post.created_at).toLocaleDateString()}</span>
           <span className="meta-dot">·</span>
@@ -139,7 +147,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           />
           <BookmarkButton postId={post.id} initialSaved={!!myBookmark} isLoggedIn={!!user} />
           <ShareButton postId={post.id} title={post.title} />
-          {user && user.id === post.author_id && (
+          {user && (user.id === post.author_id || (post.co_author_ids || []).includes(user.id)) && (
             <Link href={`/write/${post.id}`} className="btn btn-ghost btn-sm">
               Edit
             </Link>

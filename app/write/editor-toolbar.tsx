@@ -14,6 +14,7 @@ export default function EditorToolbar({
 }) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const mdInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<"image" | "video" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,6 +82,38 @@ export default function EditorToolbar({
       el.selectionStart = start;
       el.selectionEnd = start + listText.length;
     });
+  }
+
+  function insertTable() {
+    const template =
+      "\n\n| Header 1 | Header 2 | Header 3 |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n\n";
+    insertAtCursor(template);
+  }
+
+  function insertCodeBlock() {
+    const el = textareaRef.current;
+    const selected = el ? content.slice(el.selectionStart, el.selectionEnd) : "";
+    const template = `\n\n\`\`\`\n${selected || "your code here"}\n\`\`\`\n\n`;
+    if (el && selected) {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const next = content.slice(0, start) + `\n\n\`\`\`\n${selected}\n\`\`\`\n\n` + content.slice(end);
+      setContent(next);
+    } else {
+      insertAtCursor(template);
+    }
+  }
+
+  function handleMarkdownImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || "");
+      setContent(content ? content + "\n\n" + text : text);
+    };
+    reader.readAsText(file);
   }
 
   function handleLink() {
@@ -178,6 +211,21 @@ export default function EditorToolbar({
         >
           🎬 {uploading === "video" ? "Uploading…" : "Video"}
         </button>
+        <button type="button" className="btn btn-neutral btn-sm" onClick={insertTable} title="Insert table">
+          ▦ Table
+        </button>
+        <button type="button" className="btn btn-neutral btn-sm" onClick={insertCodeBlock} title="Insert code block">
+          &lt;/&gt; Code
+        </button>
+        <button
+          type="button"
+          className="btn btn-neutral btn-sm"
+          onClick={() => mdInputRef.current?.click()}
+          title="Import a .md file"
+        >
+          Import .md
+        </button>
+        <input ref={mdInputRef} type="file" accept=".md,text/markdown,text/plain" hidden onChange={handleMarkdownImport} />
         <input
           ref={imageInputRef}
           type="file"

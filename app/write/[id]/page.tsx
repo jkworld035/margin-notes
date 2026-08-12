@@ -5,7 +5,9 @@ import { useParams } from "next/navigation";
 import { updatePost } from "@/app/actions/posts";
 import CoverImageUpload from "../cover-image-upload";
 import EditorToolbar from "../editor-toolbar";
+import CoAuthorPanel from "./co-author-panel";
 import { createClient } from "@/lib/supabase/client";
+import { wordCount, estimateReadTimeClient } from "@/lib/text-stats";
 
 export default function EditPostPage() {
   const params = useParams();
@@ -17,6 +19,9 @@ export default function EditPostPage() {
   const [pending, setPending] = useState<string | null>(null);
   const [currentStatus, setCurrentStatus] = useState<string>("approved");
   const [showSchedule, setShowSchedule] = useState(false);
+  const [isPrimaryAuthor, setIsPrimaryAuthor] = useState(false);
+  const [coAuthorIds, setCoAuthorIds] = useState<string[]>([]);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -28,41 +33,62 @@ export default function EditPostPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
-  useEffect(() => {
-    async function load() {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
-      const { data: post } = await supabase
-        .from("posts")
-        .select("title, subtitle, category, tags, excerpt, content, cover_image_url, author_id, status")
-        .eq("id", postId)
-        .single();
+  const autosaveKey = `margin-notes-autosave-${postId}`;
 
-      if (!post || post.author_id !== user.id) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
-
-      setTitle(post.title);
-      setSubtitle(post.subtitle || "");
-      setCategory(post.category);
-      setTags((post.tags || []).join(", "));
-      setExcerpt(post.excerpt);
-      setContent(post.content);
-      setCoverImageUrl(post.cover_image_url || "");
-      setCurrentStatus(post.status);
+  async function loadPost() {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setNotFound(true);
       setLoading(false);
+      return;
     }
-    load();
+    const { data: post } = await supabase
+      .from("posts")
+      .select("title, subtitle, category, tags, excerpt, content, cover_image_url, author_id, co_author_ids, status")
+      .eq("id", postId)
+      .single();
+
+    if (!post || (post.author_id !== user.id && !(post.co_author_ids || []).includes(user.id))) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
+    setTitle(post.title);
+    setSubtitle(post.subtitle || "");
+    setCategory(post.category);
+    setTags((post.tags || []).join(", "));
+    setExcerpt(post.excerpt);
+    setContent(post.content);
+    setCoverImageUrl(post.cover_image_url || "");
+    setCurrentStatus(post.status);
+    setIsPrimaryAuthor(post.author_id === user.id);
+    setCoAuthorIds(post.co_author_ids || []);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadPost();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId]);
+
+  // Autosave every few seconds while editing
+  useEffect(() => {
+    if (loading) return;
+    const interval = setInterval(() => {
+      const fields = { title, subtitle, category, tags, excerpt, content };
+      try {
+        localStorage.setItem(autosaveKey, JSON.stringify(fields));
+        setLastSaved(new Date());
+      } catch {
+        // storage unavailable — autosave silently skipped
+      }
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [title, subtitle, category, tags, excerpt, content, loading, autosaveKey]);
 
   async function submitWithMode(mode: "" | "publish" | "draft" | "schedule") {
     if (!formRef.current) return;
@@ -78,6 +104,12 @@ export default function EditPostPage() {
     if (res?.error) {
       setError(res.error);
       setPending(null);
+    } else {
+      try {
+        localStorage.removeItem(autosaveKey);
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -169,7 +201,19 @@ export default function EditPostPage() {
             maxLength={20000}
             required
           />
+          <div className="char-count" style={{ display: "flex", justifyContent: "space-between" }}>
+            <span>
+              {content.length}/20000 &middot; {wordCount(content)} words &middot; {estimateReadTimeClient(content)} read
+            </span>
+            <span style={{ color: "var(--muted)" }}>
+              {lastSaved ? `Autosaved ${lastSaved.toLocaleTimeString()}` : ""}
+            </span>
+          </div>
         </div>
+
+        {isPrimaryAuthor && (
+          <CoAuthorPanel postId={postId} coAuthorIds={coAuthorIds} onChange={loadPost} />
+        )}
 
         {showSchedule && (
           <div className="form-group">
