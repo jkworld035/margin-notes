@@ -33,7 +33,11 @@ function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
       );
     }
     if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={`${keyPrefix}-${i}`}>{part.slice(2, -2)}</strong>;
+      return (
+        <strong key={`${keyPrefix}-${i}`} style={{ fontWeight: 700 }}>
+          {part.slice(2, -2)}
+        </strong>
+      );
     }
     if (part.startsWith("*") && part.endsWith("*")) {
       return <em key={`${keyPrefix}-${i}`}>{part.slice(1, -1)}</em>;
