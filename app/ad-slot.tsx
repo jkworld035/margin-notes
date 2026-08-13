@@ -23,6 +23,7 @@ export default function AdSlot({ slot }: { slot: string }) {
     }
   }, [clientId]);
 
+  // No AdSense client configured yet — render nothing (not even a placeholder)
   if (!clientId) return null;
 
   return (
