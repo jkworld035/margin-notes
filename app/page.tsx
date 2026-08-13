@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { estimateReadTime } from "./actions/posts";
+import AdSlot from "./ad-slot";
 
 const CATEGORIES = [
   "All",
@@ -201,6 +202,7 @@ export default async function HomePage({
         </div>
 
         <aside className="sidebar">
+          <AdSlot slot="1111111111" />
           <div>
             <h3>Trending</h3>
             {trending.length === 0 ? (

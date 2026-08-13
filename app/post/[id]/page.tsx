@@ -9,6 +9,7 @@ import BookmarkButton from "./bookmark-button";
 import ShareButton from "./share-button";
 import ReportButton from "./report-button";
 import Comments from "./comments";
+import AdSlot from "@/app/ad-slot";
 import ViewTracker from "./view-tracker";
 import ReadingProgress from "./reading-progress";
 
@@ -154,6 +155,8 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           )}
           {user && user.id !== post.author_id && <ReportButton postId={post.id} />}
         </div>
+
+        <AdSlot slot="2222222222" />
 
         <Comments
           postId={post.id}

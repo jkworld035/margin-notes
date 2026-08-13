@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Lora, Outfit } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import Header from "./header";
+import Footer from "./footer";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import ServiceWorkerRegister from "./service-worker-register";
@@ -43,6 +45,8 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const adsenseClientId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
+
   return (
     <html lang="en" className={`${lora.variable} ${outfit.variable}`}>
       <head>
@@ -53,10 +57,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <link rel="alternate" type="application/rss+xml" title="Margin Notes" href="/rss.xml" />
+        {adsenseClientId && (
+          <Script
+            async
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`}
+            crossOrigin="anonymous"
+            strategy="afterInteractive"
+          />
+        )}
       </head>
       <body>
         <Header />
         {children}
+        <Footer />
         <Analytics />
         <SpeedInsights />
         <ServiceWorkerRegister />
