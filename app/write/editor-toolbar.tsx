@@ -3,6 +3,120 @@
 import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+function Icon({ children }: { children: React.ReactNode }) {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {children}
+    </svg>
+  );
+}
+
+const ICONS = {
+  bold: (
+    <Icon>
+      <path d="M6 4h8a4 4 0 0 1 0 8H6zM6 12h9a4 4 0 0 1 0 8H6z" />
+    </Icon>
+  ),
+  italic: (
+    <Icon>
+      <line x1="19" y1="4" x2="10" y2="4" />
+      <line x1="14" y1="20" x2="5" y2="20" />
+      <line x1="15" y1="4" x2="9" y2="20" />
+    </Icon>
+  ),
+  heading: (
+    <Icon>
+      <path d="M6 4v16M18 4v16M6 12h12" />
+    </Icon>
+  ),
+  quote: (
+    <Icon>
+      <path d="M7 8a3 3 0 0 0-3 3v2a3 3 0 0 0 3 3M17 8a3 3 0 0 0-3 3v2a3 3 0 0 0 3 3" />
+    </Icon>
+  ),
+  bulletList: (
+    <Icon>
+      <circle cx="4" cy="6" r="1" />
+      <circle cx="4" cy="12" r="1" />
+      <circle cx="4" cy="18" r="1" />
+      <line x1="9" y1="6" x2="20" y2="6" />
+      <line x1="9" y1="12" x2="20" y2="12" />
+      <line x1="9" y1="18" x2="20" y2="18" />
+    </Icon>
+  ),
+  numberedList: (
+    <Icon>
+      <line x1="9" y1="6" x2="20" y2="6" />
+      <line x1="9" y1="12" x2="20" y2="12" />
+      <line x1="9" y1="18" x2="20" y2="18" />
+      <path d="M4 6h1v-2h-1M4 10h1.5M4 14h1v4h-1.5M4.5 18h1" />
+    </Icon>
+  ),
+  link: (
+    <Icon>
+      <path d="M9 15l6-6M8 12l-2 2a3 3 0 0 0 4 4l2-2M16 12l2-2a3 3 0 0 0-4-4l-2 2" />
+    </Icon>
+  ),
+  image: (
+    <Icon>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="8.5" cy="9.5" r="1.5" />
+      <path d="M21 15l-5-5L5 20" />
+    </Icon>
+  ),
+  video: (
+    <Icon>
+      <rect x="3" y="5" width="14" height="14" rx="2" />
+      <path d="M21 8l-4 3 4 3z" />
+    </Icon>
+  ),
+  table: (
+    <Icon>
+      <rect x="3" y="4" width="18" height="16" rx="1" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="3" y1="16" x2="21" y2="16" />
+      <line x1="12" y1="4" x2="12" y2="20" />
+    </Icon>
+  ),
+  code: (
+    <Icon>
+      <polyline points="8 6 3 12 8 18" />
+      <polyline points="16 6 21 12 16 18" />
+    </Icon>
+  ),
+  upload: (
+    <Icon>
+      <path d="M12 15V3M7 8l5-5 5 5" />
+      <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+    </Icon>
+  ),
+};
+
+function ToolbarButton({
+  icon,
+  label,
+  onClick,
+  disabled,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className="editor-toolbar-btn"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+    >
+      {icon}
+    </button>
+  );
+}
+
 export default function EditorToolbar({
   content,
   setContent,
@@ -93,14 +207,13 @@ export default function EditorToolbar({
   function insertCodeBlock() {
     const el = textareaRef.current;
     const selected = el ? content.slice(el.selectionStart, el.selectionEnd) : "";
-    const template = `\n\n\`\`\`\n${selected || "your code here"}\n\`\`\`\n\n`;
     if (el && selected) {
       const start = el.selectionStart;
       const end = el.selectionEnd;
       const next = content.slice(0, start) + `\n\n\`\`\`\n${selected}\n\`\`\`\n\n` + content.slice(end);
       setContent(next);
     } else {
-      insertAtCursor(template);
+      insertAtCursor(`\n\n\`\`\`\nyour code here\n\`\`\`\n\n`);
     }
   }
 
@@ -170,78 +283,46 @@ export default function EditorToolbar({
   }
 
   return (
-    <div>
-      <div style={{ display: "flex", gap: ".4rem", marginBottom: ".5rem", flexWrap: "wrap" }}>
-        <button type="button" className="btn btn-neutral btn-sm" onClick={() => wrapSelection("**")} title="Bold">
-          <strong>B</strong>
-        </button>
-        <button type="button" className="btn btn-neutral btn-sm" onClick={() => wrapSelection("*")} title="Italic">
-          <em>I</em>
-        </button>
-        <button type="button" className="btn btn-neutral btn-sm" onClick={() => prefixLine("## ")} title="Heading">
-          H2
-        </button>
-        <button type="button" className="btn btn-neutral btn-sm" onClick={() => prefixLine("> ")} title="Quote">
-          &ldquo;&rdquo;
-        </button>
-        <button type="button" className="btn btn-neutral btn-sm" onClick={() => insertList(false)} title="Bulleted list">
-          • List
-        </button>
-        <button type="button" className="btn btn-neutral btn-sm" onClick={() => insertList(true)} title="Numbered list">
-          1. List
-        </button>
-        <button type="button" className="btn btn-neutral btn-sm" onClick={handleLink} title="Insert link">
-          🔗 Link
-        </button>
-        <button
-          type="button"
-          className="btn btn-neutral btn-sm"
+    <div className="editor-toolbar">
+      <div className="editor-toolbar-group">
+        <ToolbarButton icon={ICONS.bold} label="Bold" onClick={() => wrapSelection("**")} />
+        <ToolbarButton icon={ICONS.italic} label="Italic" onClick={() => wrapSelection("*")} />
+        <ToolbarButton icon={ICONS.heading} label="Heading" onClick={() => prefixLine("## ")} />
+        <ToolbarButton icon={ICONS.quote} label="Quote" onClick={() => prefixLine("> ")} />
+      </div>
+      <div className="editor-toolbar-sep" />
+      <div className="editor-toolbar-group">
+        <ToolbarButton icon={ICONS.bulletList} label="Bulleted list" onClick={() => insertList(false)} />
+        <ToolbarButton icon={ICONS.numberedList} label="Numbered list" onClick={() => insertList(true)} />
+        <ToolbarButton icon={ICONS.link} label="Insert link" onClick={handleLink} />
+      </div>
+      <div className="editor-toolbar-sep" />
+      <div className="editor-toolbar-group">
+        <ToolbarButton
+          icon={ICONS.image}
+          label={uploading === "image" ? "Uploading image…" : "Insert image"}
           onClick={() => imageInputRef.current?.click()}
           disabled={uploading !== null}
-          title="Insert image"
-        >
-          🖼 {uploading === "image" ? "Uploading…" : "Image"}
-        </button>
-        <button
-          type="button"
-          className="btn btn-neutral btn-sm"
+        />
+        <ToolbarButton
+          icon={ICONS.video}
+          label={uploading === "video" ? "Uploading video…" : "Insert video"}
           onClick={() => videoInputRef.current?.click()}
           disabled={uploading !== null}
-          title="Insert video"
-        >
-          🎬 {uploading === "video" ? "Uploading…" : "Video"}
-        </button>
-        <button type="button" className="btn btn-neutral btn-sm" onClick={insertTable} title="Insert table">
-          ▦ Table
-        </button>
-        <button type="button" className="btn btn-neutral btn-sm" onClick={insertCodeBlock} title="Insert code block">
-          &lt;/&gt; Code
-        </button>
-        <button
-          type="button"
-          className="btn btn-neutral btn-sm"
-          onClick={() => mdInputRef.current?.click()}
-          title="Import a .md file"
-        >
-          Import .md
-        </button>
-        <input ref={mdInputRef} type="file" accept=".md,text/markdown,text/plain" hidden onChange={handleMarkdownImport} />
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => handleMediaUpload(e, "image")}
         />
-        <input
-          ref={videoInputRef}
-          type="file"
-          accept="video/*"
-          hidden
-          onChange={(e) => handleMediaUpload(e, "video")}
-        />
+        <ToolbarButton icon={ICONS.table} label="Insert table" onClick={insertTable} />
+        <ToolbarButton icon={ICONS.code} label="Insert code block" onClick={insertCodeBlock} />
       </div>
-      {error && <div className="form-error">{error}</div>}
+      <div className="editor-toolbar-sep" />
+      <div className="editor-toolbar-group">
+        <ToolbarButton icon={ICONS.upload} label="Import a .md file" onClick={() => mdInputRef.current?.click()} />
+      </div>
+
+      <input ref={mdInputRef} type="file" accept=".md,text/markdown,text/plain" hidden onChange={handleMarkdownImport} />
+      <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={(e) => handleMediaUpload(e, "image")} />
+      <input ref={videoInputRef} type="file" accept="video/*" hidden onChange={(e) => handleMediaUpload(e, "video")} />
+
+      {error && <div className="form-error" style={{ width: "100%" }}>{error}</div>}
     </div>
   );
 }

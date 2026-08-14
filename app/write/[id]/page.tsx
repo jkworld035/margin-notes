@@ -8,6 +8,7 @@ import EditorToolbar from "../editor-toolbar";
 import CoAuthorPanel from "./co-author-panel";
 import { createClient } from "@/lib/supabase/client";
 import { wordCount, estimateReadTimeClient } from "@/lib/text-stats";
+import { renderContent } from "@/lib/render-content";
 
 export default function EditPostPage() {
   const params = useParams();
@@ -22,6 +23,7 @@ export default function EditPostPage() {
   const [isPrimaryAuthor, setIsPrimaryAuthor] = useState(false);
   const [coAuthorIds, setCoAuthorIds] = useState<string[]>([]);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [view, setView] = useState<"write" | "preview">("write");
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -192,15 +194,53 @@ export default function EditPostPage() {
         </div>
         <div className="form-group">
           <label>Content</label>
-          <EditorToolbar content={content} setContent={setContent} textareaRef={textareaRef} />
-          <textarea
-            ref={textareaRef}
-            name="content"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            maxLength={20000}
-            required
-          />
+
+          <div className="editor-tabs">
+            <button
+              type="button"
+              className={`editor-tab${view === "write" ? " active" : ""}`}
+              onClick={() => setView("write")}
+            >
+              Write
+            </button>
+            <button
+              type="button"
+              className={`editor-tab${view === "preview" ? " active" : ""}`}
+              onClick={() => setView("preview")}
+            >
+              Preview
+            </button>
+          </div>
+
+          {view === "write" ? (
+            <>
+              <EditorToolbar content={content} setContent={setContent} textareaRef={textareaRef} />
+              <div className="editor-body-wrap">
+                <textarea
+                  ref={textareaRef}
+                  name="content"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  maxLength={20000}
+                  required
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <input type="hidden" name="content" value={content} />
+              <div className="editor-body-wrap">
+                <div className="editor-preview">
+                  {content.trim() ? (
+                    renderContent(content)
+                  ) : (
+                    <p className="editor-preview-empty">Nothing to preview yet.</p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
           <div className="char-count" style={{ display: "flex", justifyContent: "space-between" }}>
             <span>
               {content.length}/20000 &middot; {wordCount(content)} words &middot; {estimateReadTimeClient(content)} read

@@ -5,6 +5,7 @@ import { submitPost } from "@/app/actions/posts";
 import CoverImageUpload from "./cover-image-upload";
 import EditorToolbar from "./editor-toolbar";
 import { wordCount, estimateReadTimeClient } from "@/lib/text-stats";
+import { renderContent } from "@/lib/render-content";
 
 const AUTOSAVE_KEY = "margin-notes-autosave-new-post";
 
@@ -30,6 +31,7 @@ export default function WritePage() {
   const [showSchedule, setShowSchedule] = useState(false);
   const [restoreBanner, setRestoreBanner] = useState<DraftFields | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [view, setView] = useState<"write" | "preview">("write");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -206,21 +208,59 @@ export default function WritePage() {
         </div>
         <div className="form-group">
           <label>Content</label>
-          <EditorToolbar content={content} setContent={setContent} textareaRef={textareaRef} />
-          <textarea
-            ref={textareaRef}
-            name="content"
-            value={content}
-            placeholder="Write your story here. Blank lines separate paragraphs."
-            maxLength={20000}
-            onChange={(e) => setContent(e.target.value)}
-            required
-          />
-          <div className="form-hint">
-            Supports <code>## Heading</code>, <code>&gt; Quote</code>, <code>**bold**</code>,{" "}
-            <code>*italic*</code>, lists, links, tables, code blocks, and inline images/videos via the toolbar
-            buttons above.
+
+          <div className="editor-tabs">
+            <button
+              type="button"
+              className={`editor-tab${view === "write" ? " active" : ""}`}
+              onClick={() => setView("write")}
+            >
+              Write
+            </button>
+            <button
+              type="button"
+              className={`editor-tab${view === "preview" ? " active" : ""}`}
+              onClick={() => setView("preview")}
+            >
+              Preview
+            </button>
           </div>
+
+          {view === "write" ? (
+            <>
+              <EditorToolbar content={content} setContent={setContent} textareaRef={textareaRef} />
+              <div className="editor-body-wrap">
+                <textarea
+                  ref={textareaRef}
+                  name="content"
+                  value={content}
+                  placeholder="Write your story here. Blank lines separate paragraphs."
+                  maxLength={20000}
+                  onChange={(e) => setContent(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-hint">
+                Supports <code>## Heading</code>, <code>&gt; Quote</code>, <code>**bold**</code>,{" "}
+                <code>*italic*</code>, lists, links, tables, code blocks, and inline images/videos via the
+                toolbar buttons above.
+              </div>
+            </>
+          ) : (
+            <>
+              <input type="hidden" name="content" value={content} />
+              <div className="editor-body-wrap">
+                <div className="editor-preview">
+                  {content.trim() ? (
+                    renderContent(content)
+                  ) : (
+                    <p className="editor-preview-empty">Nothing to preview yet — start writing.</p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
           <div className="char-count" style={{ display: "flex", justifyContent: "space-between" }}>
             <span>
               {content.length}/20000 &middot; {wordCount(content)} words &middot; {estimateReadTimeClient(content)} read
