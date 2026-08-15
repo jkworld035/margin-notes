@@ -7,7 +7,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const { data: posts } = await supabase
     .from("posts")
-    .select("id, created_at")
+    .select("id, created_at, author_id")
     .eq("status", "approved")
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -15,6 +15,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const postEntries: MetadataRoute.Sitemap = (posts || []).map((p) => ({
     url: `${siteUrl}/post/${p.id}`,
     lastModified: new Date(p.created_at),
+    changeFrequency: "weekly",
+  }));
+
+  const authorIds = Array.from(new Set((posts || []).map((p) => p.author_id)));
+  const authorEntries: MetadataRoute.Sitemap = authorIds.map((id) => ({
+    url: `${siteUrl}/author/${id}`,
     changeFrequency: "weekly",
   }));
 
@@ -26,5 +32,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1,
     },
     ...postEntries,
+    ...authorEntries,
   ];
 }

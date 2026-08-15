@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { estimateReadTime } from "@/app/actions/posts";
 import FollowButton from "./follow-button";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
 export async function generateMetadata({
   params,
 }: {
@@ -21,6 +23,7 @@ export async function generateMetadata({
   return {
     title: `${author.name} — Margin Notes`,
     description,
+    alternates: { canonical: `${siteUrl}/author/${id}` },
     openGraph: {
       title: `${author.name} on Margin Notes`,
       description,
@@ -58,8 +61,20 @@ export default async function AuthorPage({ params }: { params: Promise<{ id: str
       : Promise.resolve({ data: null }),
   ]);
 
+  const authorJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: author.name,
+    url: `${siteUrl}/author/${id}`,
+    ...(author.bio ? { description: author.bio } : {}),
+  };
+
   return (
     <div className="profile-page">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(authorJsonLd) }}
+      />
       <div className="profile-top">
         <div className="profile-avatar-lg">{author.name[0].toUpperCase()}</div>
         <div style={{ flex: 1 }}>

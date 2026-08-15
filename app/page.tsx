@@ -1,7 +1,15 @@
 import Link from "next/link";
+import Image from "next/image";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { estimateReadTime } from "./actions/posts";
 import AdSlot from "./ad-slot";
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+export const metadata: Metadata = {
+  alternates: { canonical: siteUrl },
+};
 
 const CATEGORIES = [
   "All",
@@ -179,11 +187,15 @@ export default async function HomePage({
               posts.map((p: any) => (
                 <Link key={p.id} href={`/post/${p.id}`} className="post-card">
                   {p.cover_image_url && (
-                    <img
-                      src={p.cover_image_url}
-                      alt=""
-                      style={{ width: "100%", height: "140px", objectFit: "cover", marginBottom: ".4rem" }}
-                    />
+                    <div style={{ position: "relative", width: "100%", height: "140px", marginBottom: ".4rem" }}>
+                      <Image
+                        src={p.cover_image_url}
+                        alt={p.title}
+                        fill
+                        sizes="(max-width: 700px) 100vw, 340px"
+                        style={{ objectFit: "cover" }}
+                      />
+                    </div>
                   )}
                   <span className="post-card-tag">{p.category}</span>
                   <div className="post-card-title">{p.title}</div>

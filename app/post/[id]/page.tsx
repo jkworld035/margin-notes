@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
@@ -12,6 +13,8 @@ import Comments from "./comments";
 import AdSlot from "@/app/ad-slot";
 import ViewTracker from "./view-tracker";
 import ReadingProgress from "./reading-progress";
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export async function generateMetadata({
   params,
@@ -31,14 +34,17 @@ export async function generateMetadata({
   const authorName = (post.profiles as any)?.name;
   const title = `${post.title} — Margin Notes`;
   const description = post.excerpt;
+  const url = `${siteUrl}/post/${id}`;
 
   return {
     title,
     description,
+    alternates: { canonical: url },
     openGraph: {
       title: post.title,
       description,
       type: "article",
+      url,
       ...(authorName ? { authors: [authorName] } : {}),
       ...(post.cover_image_url ? { images: [{ url: post.cover_image_url }] } : {}),
     },
@@ -91,8 +97,35 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
       supabase.from("post_views").select("*", { count: "exact", head: true }).eq("post_id", id),
     ]);
 
+  const authorName = (post.profiles as any)?.name || "";
+  const postUrl = `${siteUrl}/post/${post.id}`;
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    description: post.excerpt,
+    datePublished: post.created_at,
+    dateModified: post.created_at,
+    author: [
+      { "@type": "Person", name: authorName, url: `${siteUrl}/author/${post.author_id}` },
+      ...(coAuthors || []).map((c: any) => ({ "@type": "Person", name: c.name })),
+    ],
+    publisher: {
+      "@type": "Organization",
+      name: "Margin Notes",
+      logo: { "@type": "ImageObject", url: `${siteUrl}/icon-512.png` },
+    },
+    mainEntityOfPage: { "@type": "WebPage", "@id": postUrl },
+    ...(post.cover_image_url ? { image: [post.cover_image_url] } : {}),
+  };
+
   return (
     <div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <ViewTracker postId={post.id} />
       <ReadingProgress targetId="post-body" />
       <div className="post-view">
@@ -104,7 +137,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         {post.subtitle && <p className="post-view-subtitle">{post.subtitle}</p>}
         <div className="post-view-meta">
           <Link href={`/author/${post.author_id}`} style={{ color: "inherit", textDecoration: "none" }}>
-            {(post.profiles as any)?.name}
+            {authorName}
           </Link>
           {coAuthors && coAuthors.length > 0 && (
             <span> &amp; {coAuthors.map((c: any) => c.name).join(", ")}</span>
@@ -118,11 +151,16 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         </div>
 
         {post.cover_image_url && (
-          <img
-            src={post.cover_image_url}
-            alt=""
-            style={{ width: "100%", maxHeight: "420px", objectFit: "cover", marginBottom: "2rem" }}
-          />
+          <div style={{ position: "relative", width: "100%", height: "420px", marginBottom: "2rem" }}>
+            <Image
+              src={post.cover_image_url}
+              alt={post.title}
+              fill
+              sizes="(max-width: 760px) 100vw, 760px"
+              style={{ objectFit: "cover" }}
+              priority
+            />
+          </div>
         )}
 
         <div id="post-body" className="post-view-body">
