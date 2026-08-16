@@ -12,6 +12,14 @@ function isVideoUrl(url: string) {
   return VIDEO_EXTENSIONS.some((ext) => clean.endsWith(ext));
 }
 
+function getEmbedInfo(url: string): { type: "youtube" | "vimeo"; id: string } | null {
+  const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/i);
+  if (yt) return { type: "youtube", id: yt[1] };
+  const vm = url.match(/vimeo\.com\/(?:video\/)?(\d+)/i);
+  if (vm) return { type: "vimeo", id: vm[1] };
+  return null;
+}
+
 function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
   // Split on bold, italic, or [text](url) links — whichever comes first
   const pattern = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|\[[^\]\n]+\]\([^)\s]+\))/g;
@@ -133,6 +141,37 @@ export function renderContent(content: string): React.ReactNode[] {
 
   return blocks.map((block, i) => {
     const trimmed = block.trim();
+
+    // A standalone line that's just a YouTube/Vimeo URL becomes an embedded player
+    if (!/\s/.test(trimmed) && /^https?:\/\//i.test(trimmed)) {
+      const embed = getEmbedInfo(trimmed);
+      if (embed) {
+        const src =
+          embed.type === "youtube"
+            ? `https://www.youtube.com/embed/${embed.id}`
+            : `https://player.vimeo.com/video/${embed.id}`;
+        return (
+          <div
+            key={i}
+            style={{
+              position: "relative",
+              paddingBottom: "56.25%",
+              height: 0,
+              margin: "1.5rem 0",
+              borderRadius: "4px",
+              overflow: "hidden",
+            }}
+          >
+            <iframe
+              src={src}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+            />
+          </div>
+        );
+      }
+    }
 
     const mediaMatch = trimmed.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
     if (mediaMatch) {

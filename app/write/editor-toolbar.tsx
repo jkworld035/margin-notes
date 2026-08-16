@@ -90,6 +90,12 @@ const ICONS = {
       <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
     </Icon>
   ),
+  embed: (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none" />
+    </Icon>
+  ),
 };
 
 function ToolbarButton({
@@ -241,6 +247,12 @@ export default function EditorToolbar({
     }
   }
 
+  function handleEmbedVideo() {
+    const url = window.prompt("Paste a YouTube or Vimeo link:");
+    if (!url) return;
+    insertAtCursor(`\n\n${url.trim()}\n\n`);
+  }
+
   async function handleMediaUpload(e: React.ChangeEvent<HTMLInputElement>, kind: "image" | "video") {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -312,6 +324,7 @@ export default function EditorToolbar({
         />
         <ToolbarButton icon={ICONS.table} label="Insert table" onClick={insertTable} />
         <ToolbarButton icon={ICONS.code} label="Insert code block" onClick={insertCodeBlock} />
+        <ToolbarButton icon={ICONS.embed} label="Embed YouTube/Vimeo video" onClick={handleEmbedVideo} />
       </div>
       <div className="editor-toolbar-sep" />
       <div className="editor-toolbar-group">

@@ -242,8 +242,8 @@ export default function WritePage() {
               </div>
               <div className="form-hint">
                 Supports <code>## Heading</code>, <code>&gt; Quote</code>, <code>**bold**</code>,{" "}
-                <code>*italic*</code>, lists, links, tables, code blocks, and inline images/videos via the
-                toolbar buttons above.
+                <code>*italic*</code>, lists, links, tables, code blocks, inline images/videos, and embedded
+                YouTube/Vimeo links via the toolbar buttons above.
               </div>
             </>
           ) : (
