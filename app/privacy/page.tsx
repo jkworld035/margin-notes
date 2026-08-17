@@ -68,8 +68,11 @@ export default function PrivacyPolicyPage() {
           Contact
         </h3>
         <p>
-          Questions about this policy can be sent to the site administrator through the contact
-          details on your profile.
+          Questions about this policy can be sent to{" "}
+          <a href="mailto:jkworld035@gmail.com" style={{ color: "var(--accent)", textDecoration: "underline" }}>
+            jkworld035@gmail.com
+          </a>
+          .
         </p>
       </div>
     </div>

@@ -15,6 +15,9 @@ export default function Footer() {
       }}
     >
       <span>&copy; {new Date().getFullYear()} Margin Notes</span>
+      <Link href="/contact" style={{ color: "inherit" }}>
+        Contact Us
+      </Link>
       <Link href="/privacy" style={{ color: "inherit" }}>
         Privacy Policy
       </Link>

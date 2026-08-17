@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Lora, Outfit } from "next/font/google";
+
 import Script from "next/script";
 import "./globals.css";
 import Header from "./header";
@@ -8,20 +8,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import ServiceWorkerRegister from "./service-worker-register";
 
-const lora = Lora({
-  subsets: ["latin"],
-  weight: ["400", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-lora",
-  display: "swap",
-});
 
-const outfit = Outfit({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-outfit",
-  display: "swap",
-});
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -60,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <html lang="en" className={`${lora.variable} ${outfit.variable}`}>
+    <html lang="en" >
       <head>
         <script
           dangerouslySetInnerHTML={{
