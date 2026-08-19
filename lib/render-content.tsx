@@ -142,9 +142,17 @@ export function renderContent(content: string): React.ReactNode[] {
   return blocks.map((block, i) => {
     const trimmed = block.trim();
 
-    // A standalone line that's just a YouTube/Vimeo URL becomes an embedded player
+    // A standalone line that's a YouTube/Vimeo URL — bare, or wrapped as [text](url) —
+    // becomes an embedded player instead of a plain link
+    let embedUrl: string | null = null;
     if (!/\s/.test(trimmed) && /^https?:\/\//i.test(trimmed)) {
-      const embed = getEmbedInfo(trimmed);
+      embedUrl = trimmed;
+    } else {
+      const linkOnly = trimmed.match(/^\[[^\]\n]*\]\(([^)\s]+)\)$/);
+      if (linkOnly) embedUrl = linkOnly[1];
+    }
+    if (embedUrl) {
+      const embed = getEmbedInfo(embedUrl);
       if (embed) {
         const src =
           embed.type === "youtube"
