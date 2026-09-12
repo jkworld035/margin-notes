@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { updatePost } from "@/app/actions/posts";
 import CoverImageUpload from "../cover-image-upload";
 import EditorToolbar from "../editor-toolbar";
+import TemplatesButton from "../templates-button";
 import CoAuthorPanel from "./co-author-panel";
 import { createClient } from "@/lib/supabase/client";
 import { wordCount, estimateReadTimeClient } from "@/lib/text-stats";
@@ -193,9 +194,12 @@ export default function EditPostPage() {
           <input type="hidden" name="coverImageUrl" value={coverImageUrl} />
         </div>
         <div className="form-group">
-          <label>Content</label>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <label style={{ marginBottom: 0 }}>Content</label>
+            <TemplatesButton content={content} onInsert={setContent} />
+          </div>
 
-          <div className="editor-tabs">
+          <div className="editor-tabs" style={{ marginTop: ".8rem" }}>
             <button
               type="button"
               className={`editor-tab${view === "write" ? " active" : ""}`}

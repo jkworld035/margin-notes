@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-
+import { recordWritingActivity } from "@/lib/writing-activity";
 const READ_WPM = 200;
 
 function estimateReadTime(content: string) {
@@ -69,10 +69,13 @@ export async function submitPost(formData: FormData) {
     .select("id")
     .single();
 
-  if (error) return { error: error.message };
+    if (error) return { error: error.message };
+
+  await recordWritingActivity(supabase, user.id, inserted.id, content);
 
   revalidatePath("/profile");
   revalidatePath("/");
+  revalidatePath("/dashboard");
   if (status === "draft") {
     redirect("/profile?tab=drafts");
   }
@@ -135,9 +138,12 @@ export async function updatePost(postId: string, formData: FormData) {
 
   if (error) return { error: error.message };
 
+  await recordWritingActivity(supabase, user.id, postId, content);
+
   revalidatePath(`/post/${postId}`);
   revalidatePath("/profile");
   revalidatePath("/");
+  revalidatePath("/dashboard");
   if (update.status === "draft") {
     redirect("/profile?tab=drafts");
   }
@@ -219,3 +225,67 @@ export async function removeCoAuthor(postId: string, coAuthorId: string) {
 }
 
 export { estimateReadTime };
+
+export async function getWritingStats() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("daily_word_goal")
+    .eq("id", user.id)
+    .single();
+
+  const goal = profile?.daily_word_goal || 300;
+
+  const { data: activity } = await supabase
+    .from("writing_activity")
+    .select("activity_date, word_count")
+    .eq("user_id", user.id)
+    .order("activity_date", { ascending: false })
+    .limit(400);
+
+  const byDate: Record<string, number> = {};
+  (activity || []).forEach((a) => {
+    byDate[a.activity_date] = (byDate[a.activity_date] || 0) + a.word_count;
+  });
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayWords = byDate[todayStr] || 0;
+
+  let streak = 0;
+  const cursor = new Date();
+  if (todayWords < goal) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  for (let i = 0; i < 400; i++) {
+    const key = cursor.toISOString().slice(0, 10);
+    if ((byDate[key] || 0) >= goal) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  return { streak, todayWords, goal };
+}
+
+export async function updateDailyWordGoal(goal: number) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const clamped = Math.max(50, Math.min(10000, Math.round(goal)));
+  const { error } = await supabase.from("profiles").update({ daily_word_goal: clamped }).eq("id", user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath("/write");
+  return { success: true, goal: clamped };
+}

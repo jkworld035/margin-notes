@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getWritingStats } from "@/app/actions/posts";
+import StreakGoalCard from "./streak-goal-card";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -14,7 +16,7 @@ export default async function DashboardPage() {
     .select("name, avatar_url")
     .eq("id", user.id)
     .single();
-
+  const writingStats = await getWritingStats();
   const { data: myPosts } = await supabase
     .from("posts")
     .select("id, title, status, created_at")
@@ -63,6 +65,14 @@ export default async function DashboardPage() {
         <h2>Welcome back, {profile?.name}</h2>
         <p>Here's how your writing is doing.</p>
       </div>
+
+      {writingStats && (
+        <StreakGoalCard
+          streak={writingStats.streak}
+          todayWords={writingStats.todayWords}
+          goal={writingStats.goal}
+        />
+      )}
 
       <div className="stats-row">
         <div className="stat-card">

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { submitPost } from "@/app/actions/posts";
 import CoverImageUpload from "./cover-image-upload";
 import EditorToolbar from "./editor-toolbar";
+import TemplatesButton from "./templates-button";
 import { wordCount, estimateReadTimeClient } from "@/lib/text-stats";
 import { renderContent } from "@/lib/render-content";
 
