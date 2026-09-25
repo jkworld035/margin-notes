@@ -2,16 +2,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { renderContent } from "@/lib/render-content";
+import BookReader from "./book-reader";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ ch?: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
+  const { ch } = await searchParams;
   const supabase = await createClient();
   const { data: book } = await supabase
     .from("books")
@@ -21,7 +24,7 @@ export async function generateMetadata({
 
   if (!book) return { title: "Book not found — Margin Notes" };
 
-  const url = `${siteUrl}/books/${id}`;
+  const url = `${siteUrl}/books/${id}${ch ? `?ch=${ch}` : ""}`;
   return {
     title: `${book.title} — Margin Notes`,
     description: book.description,
@@ -70,121 +73,72 @@ export default async function BookPage({
 
   const list = chapters || [];
   const currentNum = ch ? parseInt(ch, 10) : null;
-  const current = currentNum ? list.find((c) => c.chapter_number === currentNum) : null;
+  const initialIndex = currentNum ? list.findIndex((c) => c.chapter_number === currentNum) : -1;
 
-  const prev = current ? list.find((c) => c.chapter_number === current.chapter_number - 1) : null;
-  const next = current ? list.find((c) => c.chapter_number === current.chapter_number + 1) : null;
-
-  // Cover / table-of-contents view
-  if (!current) {
+  // Chapter reading view — hands off to the animated client-side page-turn reader
+  if (initialIndex >= 0) {
     return (
-      <div className="post-view">
-        <Link href="/books" className="post-view-back">
-          &#8592; All books
-        </Link>
-
-        {book.status !== "published" && (
-          <span
-            className="post-card-status status-pending"
-            style={{ marginBottom: "1rem", display: "inline-block" }}
-          >
-            draft — only visible to you
-          </span>
-        )}
-
-        {book.cover_image_url && (
-          <img
-            src={book.cover_image_url}
-            alt={book.title}
-            style={{ width: "100%", maxHeight: "360px", objectFit: "cover", marginBottom: "2rem" }}
-          />
-        )}
-
-        <div className="book-cover">
-          <span className="book-cover-eyebrow">A Book on Margin Notes</span>
-          <h1>{book.title}</h1>
-          <div className="book-cover-byline">
-            by{" "}
-            <Link href={`/author/${book.author_id}`} style={{ color: "inherit" }}>
-              {(book.profiles as any)?.name}
-            </Link>
-          </div>
-          {book.description && <p className="book-cover-desc">{book.description}</p>}
-          {isAuthor && (
-            <div style={{ marginTop: "1.4rem" }}>
-              <Link href={`/books/${book.id}/edit`} className="btn btn-ghost btn-sm">
-                Edit book
-              </Link>
-            </div>
-          )}
-        </div>
-
-        <div className="book-toc-heading">Contents</div>
-
-        {list.length === 0 ? (
-          <p style={{ color: "var(--muted)", fontSize: ".9rem", textAlign: "center" }}>No chapters yet.</p>
-        ) : (
-          <nav className="book-toc">
-            {list.map((c) => (
-              <Link key={c.id} href={`/books/${book.id}?ch=${c.chapter_number}`} className="book-toc-item">
-                <span className="book-toc-num">{c.chapter_number}</span>
-                <span className="book-toc-title">{c.title}</span>
-                <span className="book-toc-leader" />
-              </Link>
-            ))}
-          </nav>
-        )}
+      <div style={{ padding: "clamp(1.5rem,4vw,3rem) clamp(1rem,4vw,3rem)" }}>
+        <BookReader bookId={book.id} bookTitle={book.title} chapters={list} initialIndex={initialIndex} />
       </div>
     );
   }
 
-  // Single chapter — styled as a book page
+  // Cover / table-of-contents view
   return (
-    <div style={{ padding: "clamp(1.5rem,4vw,3rem) clamp(1rem,4vw,3rem)" }}>
-      <div style={{ maxWidth: "680px", margin: "0 auto 1.5rem" }}>
-        <Link href={`/books/${book.id}`} className="post-view-back">
-          &#8592; {book.title}
-        </Link>
-      </div>
+    <div className="post-view">
+      <Link href="/books" className="post-view-back">
+        &#8592; All books
+      </Link>
 
-      <div className="book-page">
-        <div className="book-page-header">
-          <span className="book-page-chapter-label">Chapter {current.chapter_number}</span>
-          <h1>{current.title}</h1>
-          <div className="book-page-rule" />
+      {book.status !== "published" && (
+        <span className="post-card-status status-pending" style={{ marginBottom: "1rem", display: "inline-block" }}>
+          draft — only visible to you
+        </span>
+      )}
+
+      {book.cover_image_url && (
+        <img
+          src={book.cover_image_url}
+          alt={book.title}
+          style={{ width: "100%", maxHeight: "360px", objectFit: "cover", marginBottom: "2rem" }}
+        />
+      )}
+
+      <div className="book-cover">
+        <span className="book-cover-eyebrow">A Book on Margin Notes</span>
+        <h1>{book.title}</h1>
+        <div className="book-cover-byline">
+          by{" "}
+          <Link href={`/author/${book.author_id}`} style={{ color: "inherit" }}>
+            {(book.profiles as any)?.name}
+          </Link>
         </div>
-
-        <div className="book-page-body">{renderContent(current.content)}</div>
-
-        <div className="book-page-number">
-          — {current.chapter_number} of {list.length} —
-        </div>
-      </div>
-
-      <div className="book-page-nav">
-        {prev ? (
-          <Link href={`/books/${book.id}?ch=${prev.chapter_number}`} className="book-page-nav-btn">
-            <span className="book-page-nav-label">&#8592; Previous</span>
-            <span className="book-page-nav-title">{prev.title}</span>
-          </Link>
-        ) : (
-          <span />
-        )}
-        {next ? (
-          <Link
-            href={`/books/${book.id}?ch=${next.chapter_number}`}
-            className="book-page-nav-btn book-page-nav-next"
-          >
-            <span className="book-page-nav-label">Next &#8594;</span>
-            <span className="book-page-nav-title">{next.title}</span>
-          </Link>
-        ) : (
-          <Link href={`/books/${book.id}`} className="book-page-nav-btn book-page-nav-next">
-            <span className="book-page-nav-label">Finished</span>
-            <span className="book-page-nav-title">Back to Contents</span>
-          </Link>
+        {book.description && <p className="book-cover-desc">{book.description}</p>}
+        {isAuthor && (
+          <div style={{ marginTop: "1.4rem" }}>
+            <Link href={`/books/${book.id}/edit`} className="btn btn-ghost btn-sm">
+              Edit book
+            </Link>
+          </div>
         )}
       </div>
+
+      <div className="book-toc-heading">Contents</div>
+
+      {list.length === 0 ? (
+        <p style={{ color: "var(--muted)", fontSize: ".9rem", textAlign: "center" }}>No chapters yet.</p>
+      ) : (
+        <nav className="book-toc">
+          {list.map((c) => (
+            <Link key={c.id} href={`/books/${book.id}?ch=${c.chapter_number}`} className="book-toc-item">
+              <span className="book-toc-num">{c.chapter_number}</span>
+              <span className="book-toc-title">{c.title}</span>
+              <span className="book-toc-leader" />
+            </Link>
+          ))}
+        </nav>
+      )}
     </div>
   );
 }
