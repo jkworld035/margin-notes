@@ -198,7 +198,7 @@ header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px 
 .book-page-nav-next{text-align:right;margin-left:auto}
 
 /* ── Animated page-turn ── */
-.flip-stage{position:relative;max-width:680px;margin:0 auto;perspective:2200px;min-height:520px}
+.flip-stage{position:relative;max-width:680px;margin:0 auto;perspective:2200px;height:600px}
 .flip-back{position:absolute;inset:0;z-index:1}
 .flip-front{position:relative;z-index:2;transform-origin:left center;backface-visibility:hidden;box-shadow:2px 0 10px rgba(0,0,0,.08);height:100%}
 .flip-front.flip-origin-right{transform-origin:right center}
@@ -206,4 +206,4 @@ header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px 
 .flip-front.flip-turning-prev{transition:transform .62s cubic-bezier(.55,.06,.45,.94);transform:rotateY(178deg)}
 .flip-shade{position:absolute;inset:0;pointer-events:none;opacity:0;z-index:3;transition:opacity .3s}
 .flip-shade.flip-shade-on{opacity:1;background:linear-gradient(to right,rgba(0,0,0,.18),transparent 45%)}
-@media(max-width:700px){.flip-stage{min-height:640px}}
+@media(max-width:700px){.flip-stage{height:680px}}
