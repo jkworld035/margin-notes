@@ -19,7 +19,7 @@ export default async function BooksPage() {
 
   const { data: books } = await supabase
     .from("books")
-    .select("id, title, description, cover_image_url, created_at, profiles!books_author_id_fkey(name)")
+    .select("id, title, description, cover_image_url, price_inr, created_at, profiles!books_author_id_fkey(name)")
     .eq("status", "published")
     .order("created_at", { ascending: false });
 
@@ -80,7 +80,19 @@ export default async function BooksPage() {
                     />
                   </div>
                 )}
-                <span className="post-card-tag">Book</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="post-card-tag">Book</span>
+                  <span
+                    style={{
+                      fontSize: ".72rem",
+                      fontWeight: 600,
+                      letterSpacing: ".06em",
+                      color: b.price_inr > 0 ? "var(--accent)" : "var(--green)",
+                    }}
+                  >
+                    {b.price_inr > 0 ? `₹${b.price_inr}` : "FREE"}
+                  </span>
+                </div>
                 <div className="post-card-title">{b.title}</div>
                 <div className="post-card-excerpt">{b.description}</div>
                 <div className="post-card-meta">

@@ -42,6 +42,15 @@ export default function NewBookPage() {
         </div>
 
         <div className="form-group">
+          <label>Price (₹)</label>
+          <input name="price" type="number" min={0} max={100000} step={1} defaultValue={0} />
+          <div className="form-hint">
+            Enter 0 to make the book free. For a paid book, readers can read the first chapter free and unlock
+            the rest by buying it.
+          </div>
+        </div>
+
+        <div className="form-group">
           <label>Cover Image (optional)</label>
           <CoverImageUpload onUploaded={setCoverImageUrl} />
           <input type="hidden" name="coverImageUrl" value={coverImageUrl} />

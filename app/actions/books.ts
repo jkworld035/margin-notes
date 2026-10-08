@@ -4,6 +4,17 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+
+function parsePrice(raw: FormDataEntryValue | null): { price: number } | { error: string } {
+  const value = String(raw ?? "0").trim();
+  if (value === "") return { price: 0 };
+  const num = Number(value);
+  if (!Number.isFinite(num) || !Number.isInteger(num)) return { error: "Price must be a whole number of rupees." };
+  if (num < 0) return { error: "Price can't be negative." };
+  if (num > 100000) return { error: "Price can't be more than ₹1,00,000." };
+  return { price: num };
+}
+
 export async function createBook(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -14,6 +25,8 @@ export async function createBook(formData: FormData) {
   const title = String(formData.get("title") || "").trim();
   const description = String(formData.get("description") || "").trim();
   const coverImageUrl = String(formData.get("coverImageUrl") || "").trim();
+  const priceResult = parsePrice(formData.get("price"));
+  if ("error" in priceResult) return { error: priceResult.error };
 
   if (!title) return { error: "Give your book a title." };
 
@@ -24,6 +37,7 @@ export async function createBook(formData: FormData) {
       title,
       description,
       cover_image_url: coverImageUrl || null,
+      price_inr: priceResult.price,
     })
     .select("id")
     .single();
@@ -45,6 +59,8 @@ export async function updateBook(bookId: string, formData: FormData) {
   const title = String(formData.get("title") || "").trim();
   const description = String(formData.get("description") || "").trim();
   const coverImageUrl = String(formData.get("coverImageUrl") || "").trim();
+  const priceResult = parsePrice(formData.get("price"));
+  if ("error" in priceResult) return { error: priceResult.error };
 
   if (!title) return { error: "Give your book a title." };
 
@@ -54,6 +70,7 @@ export async function updateBook(bookId: string, formData: FormData) {
       title,
       description,
       cover_image_url: coverImageUrl || null,
+      price_inr: priceResult.price,
       updated_at: new Date().toISOString(),
     })
     .eq("id", bookId)

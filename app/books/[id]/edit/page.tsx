@@ -32,6 +32,7 @@ export default function EditBookPage() {
   const [description, setDescription] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [status, setStatus] = useState<"draft" | "published">("draft");
+  const [price, setPrice] = useState("0");
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -53,7 +54,7 @@ export default function EditBookPage() {
 
     const { data: book } = await supabase
       .from("books")
-      .select("title, description, cover_image_url, status, author_id")
+      .select("title, description, cover_image_url, status, author_id, price_inr")
       .eq("id", bookId)
       .single();
 
@@ -67,6 +68,7 @@ export default function EditBookPage() {
     setDescription(book.description || "");
     setCoverImageUrl(book.cover_image_url || "");
     setStatus(book.status);
+    setPrice(String(book.price_inr ?? 0));
 
     const { data: chs } = await supabase
       .from("book_chapters")
@@ -103,6 +105,7 @@ export default function EditBookPage() {
     fd.set("title", title);
     fd.set("description", description);
     fd.set("coverImageUrl", coverImageUrl);
+    fd.set("price", price);
     const res = await updateBook(bookId, fd);
     setSaving(false);
     if (res?.error) setError(res.error);
@@ -254,6 +257,21 @@ export default function EditBookPage() {
                   maxLength={600}
                   style={{ minHeight: "100px" }}
                 />
+              </div>
+              <div className="form-group">
+                <label>Price (₹)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100000}
+                  step={1}
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                />
+                <div className="form-hint">
+                  0 = free. For paid books, the first chapter stays free as a preview. Past purchases keep the
+                  price they were bought at.
+                </div>
               </div>
               <div className="form-group">
                 <label>Cover Image</label>

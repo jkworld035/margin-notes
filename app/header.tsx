@@ -29,8 +29,8 @@ export default async function Header() {
 
   return (
     <header>
-      <Link href="/" className="logo">
-        Margin<span> Notes</span>
+      <Link href="/" className="logo" style={{ display: "flex", alignItems: "center" }}>
+        <img src="/logo.png" alt="Margin-Notes" style={{ height: "36px", width: "auto" }} />
       </Link>
       <form action="/" method="get" className="header-search">
         <input type="text" name="q" placeholder="Search stories, tags…" />

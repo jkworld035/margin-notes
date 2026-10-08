@@ -4,10 +4,23 @@ import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { renderContent } from "@/lib/render-content";
+import BuyButton from "./buy-button";
 
-type Chapter = { id: string; title: string; content: string; chapter_number: number };
+type Chapter = { id: string; title: string; content: string; chapter_number: number; locked?: boolean };
 
-function ChapterPage({ chapter, total }: { chapter: Chapter; total: number }) {
+function ChapterPage({
+  chapter,
+  total,
+  bookId,
+  priceInr,
+  isLoggedIn,
+}: {
+  chapter: Chapter;
+  total: number;
+  bookId: string;
+  priceInr: number;
+  isLoggedIn: boolean;
+}) {
   return (
     <div className="book-page">
       <div className="book-page-header">
@@ -15,7 +28,24 @@ function ChapterPage({ chapter, total }: { chapter: Chapter; total: number }) {
         <h1>{chapter.title}</h1>
         <div className="book-page-rule" />
       </div>
-      <div className="book-page-body">{renderContent(chapter.content)}</div>
+
+      {chapter.locked ? (
+        <div style={{ textAlign: "center", padding: "2rem 0" }}>
+          <div style={{ fontSize: "2rem", marginBottom: ".6rem" }}>🔒</div>
+          <p style={{ fontFamily: "var(--serif)", fontSize: "1.15rem", marginBottom: ".4rem" }}>
+            You&apos;ve reached the end of the free preview.
+          </p>
+          <p style={{ color: "var(--muted)", fontSize: ".9rem", marginBottom: "1.4rem" }}>
+            Buy this book to keep reading.
+          </p>
+          <div style={{ display: "inline-block" }}>
+            <BuyButton bookId={bookId} priceInr={priceInr} isLoggedIn={isLoggedIn} />
+          </div>
+        </div>
+      ) : (
+        <div className="book-page-body">{renderContent(chapter.content)}</div>
+      )}
+
       <div className="book-page-number">
         — {chapter.chapter_number} of {total} —
       </div>
@@ -28,11 +58,15 @@ export default function BookReader({
   bookTitle,
   chapters,
   initialIndex,
+  priceInr,
+  isLoggedIn,
 }: {
   bookId: string;
   bookTitle: string;
   chapters: Chapter[];
   initialIndex: number;
+  priceInr: number;
+  isLoggedIn: boolean;
 }) {
   const router = useRouter();
   const [index, setIndex] = useState(initialIndex);
@@ -102,11 +136,11 @@ export default function BookReader({
       <div className="flip-stage" tabIndex={0} onKeyDown={onKeyDown}>
         {target && (
           <div className="flip-back">
-            <ChapterPage chapter={target} total={chapters.length} />
+            <ChapterPage chapter={target} total={chapters.length} bookId={bookId} priceInr={priceInr} isLoggedIn={isLoggedIn} />
           </div>
         )}
         <div className={frontClass} style={resetting ? { transition: "none" } : undefined}>
-          <ChapterPage chapter={current} total={chapters.length} />
+          <ChapterPage chapter={current} total={chapters.length} bookId={bookId} priceInr={priceInr} isLoggedIn={isLoggedIn} />
         </div>
         <div className={`flip-shade${direction ? " flip-shade-on" : ""}`} />
       </div>
