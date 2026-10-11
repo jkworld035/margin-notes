@@ -189,7 +189,9 @@ export default function EditBookPage() {
             type="button"
             onClick={() => {
               if (confirm("Delete this entire book and all its chapters? This can't be undone.")) {
-                deleteBook(bookId);
+                deleteBook(bookId).then((r) => {
+                  if (r?.error) alert(r.error);
+                });
               }
             }}
           >

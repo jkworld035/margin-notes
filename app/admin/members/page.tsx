@@ -32,6 +32,9 @@ export default async function MembersPage() {
         <Link href="/admin/members" className="admin-tab active">
           Members
         </Link>
+                <Link href="/admin/payouts" className="admin-tab">
+          Payouts
+        </Link>
         <Link href="/admin/reports" className="admin-tab">
           Reports
         </Link>

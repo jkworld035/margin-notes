@@ -63,6 +63,9 @@ export default async function AdminPage({
         <Link href="/admin/members" className="admin-tab">
           Members
         </Link>
+                <Link href="/admin/payouts" className="admin-tab">
+          Payouts
+        </Link>
         <Link href="/admin/reports" className="admin-tab">
           Reports
         </Link>

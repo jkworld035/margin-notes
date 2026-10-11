@@ -46,6 +46,11 @@ export default async function ReportsPage({
             Members
           </Link>
         </span>
+                <span className="admin-tab">
+          <Link href="/admin/payouts" style={{ color: "inherit", textDecoration: "none" }}>
+            Payouts
+          </Link>
+        </span>
         <span className="admin-tab active">Reports</span>
       </div>
 

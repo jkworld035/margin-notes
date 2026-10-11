@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getWritingStats } from "@/app/actions/posts";
 import StreakGoalCard from "./streak-goal-card";
-
+import BooksSection from "./books-section";
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
@@ -73,7 +73,7 @@ export default async function DashboardPage() {
           goal={writingStats.goal}
         />
       )}
-
+      <BooksSection userId={user.id} />
       <div className="stats-row">
         <div className="stat-card">
           <div className="stat-num">{myPosts?.length || 0}</div>

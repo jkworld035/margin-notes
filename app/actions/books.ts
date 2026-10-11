@@ -3,8 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-
-
+import { getBookTemplate, chapterStarter } from "@/app/books/book-templates";
+import { getBookTemplate, chapterStarter } from "@/app/books/book-templates";
 function parsePrice(raw: FormDataEntryValue | null): { price: number } | { error: string } {
   const value = String(raw ?? "0").trim();
   if (value === "") return { price: 0 };
@@ -46,6 +46,20 @@ export async function createBook(formData: FormData) {
 
   revalidatePath("/books");
   revalidatePath("/profile");
+    // Optional: start from a category template (chapters are created on the server
+  // from our own template list, never from anything the browser sends).
+  const templateId = String(formData.get("templateId") || "");
+  const template = templateId ? getBookTemplate(templateId) : undefined;
+  if (template) {
+    await supabase.from("book_chapters").insert(
+      template.chapters.map((c, i) => ({
+        book_id: inserted.id,
+        title: c.title,
+        content: chapterStarter(c.prompt),
+        chapter_number: i + 1,
+      }))
+    );
+  }
   redirect(`/books/${inserted.id}/edit`);
 }
 

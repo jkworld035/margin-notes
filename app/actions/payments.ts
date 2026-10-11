@@ -19,6 +19,29 @@ function getRazorpayConfig() {
   return { keyId, keySecret, client: new Razorpay({ key_id: keyId, key_secret: keySecret }) };
 }
 
+// Reads the current author share from platform settings (default 60%) and
+// splits the amount. The result is stored on the purchase, so later changes
+// to the rate never rewrite past sales.
+async function computeRevenueSplit(
+  admin: ReturnType<typeof createAdminClient>,
+  amountPaise: number
+) {
+  let percent = 60;
+  const { data } = await admin
+    .from("platform_settings")
+    .select("author_share_percent")
+    .eq("id", 1)
+    .maybeSingle();
+  if (data && typeof data.author_share_percent === "number") percent = data.author_share_percent;
+
+  const authorAmount = Math.floor((amountPaise * percent) / 100);
+  return {
+    author_share_percent: percent,
+    author_amount_paise: authorAmount,
+    platform_amount_paise: amountPaise - authorAmount,
+  };
+}
+
 // Step 1 — create a Razorpay order for a book.
 // The amount is read from the database here on the server; the browser never
 // supplies a price, so it can't be tampered with.
@@ -108,7 +131,7 @@ export async function verifyRazorpayPayment(input: {
   // Only the buyer who created this order can verify it.
   const { data: purchase } = await supabase
     .from("book_purchases")
-    .select("id, book_id, status")
+    .select("id, book_id, status, amount_paise")
     .eq("razorpay_order_id", razorpay_order_id)
     .eq("buyer_id", user.id)
     .maybeSingle();
@@ -132,12 +155,14 @@ export async function verifyRazorpayPayment(input: {
     // No RLS update policy exists for users on purpose — only this trusted
     // server path, after a valid signature, can mark a purchase as paid.
     const admin = createAdminClient();
+    const split = await computeRevenueSplit(admin, purchase.amount_paise);
     const { error } = await admin
       .from("book_purchases")
       .update({
         status: "paid",
         razorpay_payment_id,
         paid_at: new Date().toISOString(),
+        ...split,
       })
       .eq("id", purchase.id)
       .in("status", ["created", "failed"]);
