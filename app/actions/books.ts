@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getBookTemplate, chapterStarter } from "@/app/books/book-templates";
-import { getBookTemplate, chapterStarter } from "@/app/books/book-templates";
 function parsePrice(raw: FormDataEntryValue | null): { price: number } | { error: string } {
   const value = String(raw ?? "0").trim();
   if (value === "") return { price: 0 };
