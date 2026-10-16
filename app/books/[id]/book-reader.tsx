@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -28,6 +29,8 @@ const FLIP_DURATION = 420;
 
 function splitLongBlock(block: string): string[] {
   const trimmed = block.trim();
+
+  if (!trimmed) return [];
 
   // Keep structured content together whenever possible.
   if (
@@ -58,6 +61,7 @@ function splitLongBlock(block: string): string[] {
   }
 
   if (current) result.push(current);
+
   return result;
 }
 
@@ -83,11 +87,15 @@ function paginateContent(content: string): string[] {
       currentLength = 0;
     }
 
+    const separatorLength = current.length ? 2 : 0;
     current.push(block);
-    currentLength += block.length + (current.length > 1 ? 2 : 0);
+    currentLength += block.length + separatorLength;
   }
 
-  if (current.length > 0) pages.push(current.join("\n\n"));
+  if (current.length > 0) {
+    pages.push(current.join("\n\n"));
+  }
+
   return pages.length ? pages : [""];
 }
 
@@ -121,7 +129,9 @@ function ChapterPage({
           <span className="book-page-chapter-label">
             Chapter {chapter.chapter_number}
           </span>
+
           <h1>{chapter.title}</h1>
+
           <div className="book-page-rule" />
         </header>
       ) : (
@@ -142,7 +152,10 @@ function ChapterPage({
 
       {chapter.locked ? (
         <div style={{ textAlign: "center", padding: "2rem 0" }}>
-          <div style={{ fontSize: "2rem", marginBottom: ".6rem" }}>🔒</div>
+          <div style={{ fontSize: "2rem", marginBottom: ".6rem" }}>
+            🔒
+          </div>
+
           <p
             style={{
               fontFamily: "var(--serif)",
@@ -152,6 +165,7 @@ function ChapterPage({
           >
             You&apos;ve reached the end of the free preview.
           </p>
+
           <p
             style={{
               color: "var(--muted)",
@@ -161,6 +175,7 @@ function ChapterPage({
           >
             Buy this book to keep reading.
           </p>
+
           <div style={{ display: "inline-block" }}>
             <BuyButton
               bookId={bookId}
@@ -191,6 +206,7 @@ function ChapterPage({
             ? "Preview"
             : `Chapter ${chapter.chapter_number} · ${chapterPageNumber} / ${chapterPageCount}`}
         </span>
+
         <span style={{ marginLeft: ".75rem" }}>
           {pageNumber} · {totalChapters} chapters
         </span>
@@ -218,7 +234,7 @@ export default function BookReader({
 
   const safeInitialIndex = Math.max(
     0,
-    Math.min(initialIndex, chapters.length - 1)
+    Math.min(initialIndex, Math.max(0, chapters.length - 1))
   );
 
   const [index, setIndex] = useState(safeInitialIndex);
@@ -227,7 +243,9 @@ export default function BookReader({
   const [resetting, setResetting] = useState(false);
   const [fontSize, setFontSize] = useState(18);
   const [theme, setTheme] = useState<ReaderTheme>("paper");
+
   const busy = useRef(false);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
 
   const pagesByChapter = useMemo(
     () =>
@@ -237,9 +255,13 @@ export default function BookReader({
     [chapters]
   );
 
+  // Restore the saved reading position.
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem(`margin-notes-reader-${bookId}`);
+      const saved = window.localStorage.getItem(
+        `margin-notes-reader-${bookId}`
+      );
+
       if (!saved) return;
 
       const position = JSON.parse(saved) as {
@@ -253,13 +275,16 @@ export default function BookReader({
 
       if (savedIndex >= 0) {
         const savedChapter = chapters[savedIndex];
+
         // Never restore the reader directly into a locked chapter.
         if (!savedChapter.locked) {
           const maxPage = pagesByChapter[savedIndex].length - 1;
+
           setIndex(savedIndex);
           setPageIndex(
             Math.max(0, Math.min(position.pageIndex ?? 0, maxPage))
           );
+
           router.replace(
             `/books/${bookId}?ch=${savedChapter.chapter_number}`,
             { scroll: false }
@@ -271,6 +296,7 @@ export default function BookReader({
     }
   }, [bookId, chapters, pagesByChapter, router]);
 
+  // Save reading progress whenever the chapter or page changes.
   useEffect(() => {
     try {
       window.localStorage.setItem(
@@ -302,6 +328,7 @@ export default function BookReader({
     1;
 
   const hasPrev = index > 0 || pageIndex > 0;
+
   const hasNext =
     pageIndex < currentPages.length - 1 || index < chapters.length - 1;
 
@@ -318,7 +345,7 @@ export default function BookReader({
           : index > 0
             ? {
                 index: index - 1,
-                pageIndex: pagesByChapter[index - 1].length - 1,
+                pageIndex: (pagesByChapter[index - 1]?.length ?? 1) - 1,
               }
             : null
         : null;
@@ -326,13 +353,15 @@ export default function BookReader({
   const targetChapter = targetPosition
     ? chapters[targetPosition.index]
     : null;
+
   const targetContent = targetPosition
     ? pagesByChapter[targetPosition.index]?.[targetPosition.pageIndex] ?? ""
     : "";
 
+  // Turn to the next or previous page.
   const go = useCallback(
     (dir: "next" | "prev") => {
-      if (busy.current) return;
+      if (busy.current || !chapters.length) return;
 
       const currentPageCount = pagesByChapter[index]?.length ?? 1;
 
@@ -386,6 +415,67 @@ export default function BookReader({
     [bookId, chapters, index, pageIndex, pagesByChapter, router]
   );
 
+  // Record the start point for a touch or mouse swipe.
+  const handlePointerDown = (
+    event: ReactPointerEvent<HTMLDivElement>
+  ) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+
+    const target = event.target;
+
+    if (
+      target instanceof HTMLElement &&
+      target.closest("button, a, input, select, textarea")
+    ) {
+      swipeStart.current = null;
+      return;
+    }
+
+    swipeStart.current = {
+      x: event.clientX,
+      y: event.clientY,
+    };
+
+    // Keep receiving pointer events if the finger moves outside the reader.
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture may not be available in every environment.
+    }
+  };
+
+  // Navigate only when the gesture is clearly horizontal.
+  const handlePointerUp = (
+    event: ReactPointerEvent<HTMLDivElement>
+  ) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+
+    if (!start) return;
+
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+
+    // Ignore short movements and mostly vertical scrolling.
+    if (
+      Math.abs(deltaX) < 55 ||
+      Math.abs(deltaX) < Math.abs(deltaY) * 1.3
+    ) {
+      return;
+    }
+
+    if (deltaX < 0) {
+      go("next");
+    } else {
+      go("prev");
+    }
+  };
+
+  const handlePointerCancel = () => {
+    swipeStart.current = null;
+  };
+
+  // Keyboard navigation.
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (
@@ -435,8 +525,21 @@ export default function BookReader({
     .filter(Boolean)
     .join(" ");
 
+  // Gracefully handle a book without any chapters.
+  if (!current) {
+    return (
+      <div style={{ maxWidth: "760px", margin: "2rem auto" }}>
+        <p>This book does not have any chapters available yet.</p>
+        <Link href={`/books/${bookId}`} className="post-view-back">
+          ← Back to book
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div>
+      {/* Reader toolbar */}
       <div
         style={{
           maxWidth: "900px",
@@ -471,7 +574,9 @@ export default function BookReader({
           >
             A−
           </button>
+
           <span aria-live="polite">{fontSize}px</span>
+
           <button
             type="button"
             onClick={() => setFontSize((size) => Math.min(24, size + 1))}
@@ -485,10 +590,13 @@ export default function BookReader({
           <label htmlFor="reader-theme" style={{ marginLeft: ".35rem" }}>
             Theme
           </label>
+
           <select
             id="reader-theme"
             value={theme}
-            onChange={(event) => setTheme(event.target.value as ReaderTheme)}
+            onChange={(event) =>
+              setTheme(event.target.value as ReaderTheme)
+            }
             style={{ padding: ".4rem", borderRadius: "4px" }}
           >
             <option value="paper">Paper</option>
@@ -498,11 +606,15 @@ export default function BookReader({
         </div>
       </div>
 
+      {/* Animated page-turn area */}
       <div
         className="flip-stage"
         tabIndex={0}
         onKeyDown={onKeyDown}
-        aria-label="Book reader. Use the left and right arrow keys to turn pages."
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        aria-label="Book reader. Swipe horizontally or use the left and right arrow keys to turn pages."
         style={{
           ...themeStyles[theme],
           maxWidth: "760px",
@@ -523,7 +635,9 @@ export default function BookReader({
                 1
               }
               chapterPageNumber={targetPosition.pageIndex + 1}
-              chapterPageCount={pagesByChapter[targetPosition.index].length}
+              chapterPageCount={
+                pagesByChapter[targetPosition.index].length
+              }
               totalChapters={chapters.length}
               bookId={bookId}
               priceInr={priceInr}
@@ -554,9 +668,12 @@ export default function BookReader({
           />
         </div>
 
-        <div className={`flip-shade${direction ? " flip-shade-on" : ""}`} />
+        <div
+          className={`flip-shade${direction ? " flip-shade-on" : ""}`}
+        />
       </div>
 
+      {/* Reading progress */}
       <div
         style={{
           maxWidth: "760px",
@@ -572,7 +689,10 @@ export default function BookReader({
         <span>
           Page {pageNumber} of {totalPages}
         </span>
-        <span>{Math.round((pageNumber / Math.max(totalPages, 1)) * 100)}% read</span>
+
+        <span>
+          {Math.round((pageNumber / Math.max(totalPages, 1)) * 100)}% read
+        </span>
       </div>
 
       <div
@@ -600,6 +720,7 @@ export default function BookReader({
         />
       </div>
 
+      {/* Previous and next controls */}
       <div className="book-page-nav">
         <button
           className="book-page-nav-btn"
@@ -607,7 +728,10 @@ export default function BookReader({
           disabled={!hasPrev}
           type="button"
         >
-          <span className="book-page-nav-label">← Previous page</span>
+          <span className="book-page-nav-label">
+            ← Previous page
+          </span>
+
           <span className="book-page-nav-title">
             {pageIndex > 0
               ? `Page ${pageIndex}`
@@ -624,7 +748,10 @@ export default function BookReader({
             disabled={!!current.locked}
             type="button"
           >
-            <span className="book-page-nav-label">Next page →</span>
+            <span className="book-page-nav-label">
+              Next page →
+            </span>
+
             <span className="book-page-nav-title">
               {pageIndex < currentPages.length - 1
                 ? `Page ${pageIndex + 2}`
@@ -636,8 +763,13 @@ export default function BookReader({
             href={`/books/${bookId}`}
             className="book-page-nav-btn book-page-nav-next"
           >
-            <span className="book-page-nav-label">Finished</span>
-            <span className="book-page-nav-title">Back to Contents</span>
+            <span className="book-page-nav-label">
+              Finished
+            </span>
+
+            <span className="book-page-nav-title">
+              Back to Contents
+            </span>
           </Link>
         )}
       </div>
@@ -650,7 +782,7 @@ export default function BookReader({
           marginTop: "1rem",
         }}
       >
-        Tip: Use ← and → on your keyboard to turn pages.
+        Tip: Swipe left or right on the page, or use ← and → on your keyboard.
       </p>
     </div>
   );
