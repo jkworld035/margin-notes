@@ -239,7 +239,13 @@ export default function BookReader({
   const [theme, setTheme] = useState<ReaderTheme>("paper");
 
   const busy = useRef(false);
-  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const swipeStart = useRef<{ x: number; y: number; t: number } | null>(null);
+  const dragging = useRef(false);
+  const lastMove = useRef({ x: 0, t: 0, vx: 0 });
+  const [dragDir, setDragDir] = useState<"next" | "prev" | null>(null);
+  const [dragP, setDragP] = useState(0);
+  const [snapping, setSnapping] = useState(false);
+  const activeDir = direction ?? dragDir;
 
   const pagesByChapter = useMemo(
     () =>
@@ -327,13 +333,13 @@ export default function BookReader({
     pageIndex < currentPages.length - 1 || index < chapters.length - 1;
 
   const targetPosition =
-    direction === "next"
+    activeDir === "next"
       ? pageIndex < currentPages.length - 1
         ? { index, pageIndex: pageIndex + 1 }
         : index < chapters.length - 1
           ? { index: index + 1, pageIndex: 0 }
           : null
-      : direction === "prev"
+      : activeDir === "prev"
         ? pageIndex > 0
           ? { index, pageIndex: pageIndex - 1 }
           : index > 0
@@ -409,11 +415,12 @@ export default function BookReader({
     [bookId, chapters, index, pageIndex, pagesByChapter, router]
   );
 
-  // Record the start point for a touch or mouse swipe.
+  // Start tracking a drag (finger or mouse).
   const handlePointerDown = (
     event: ReactPointerEvent<HTMLDivElement>
   ) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (busy.current || snapping) return;
 
     const target = event.target;
 
@@ -428,45 +435,100 @@ export default function BookReader({
     swipeStart.current = {
       x: event.clientX,
       y: event.clientY,
+      t: performance.now(),
     };
-
-    // Keep receiving pointer events if the finger moves outside the reader.
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // Pointer capture may not be available in every environment.
-    }
+    dragging.current = false;
+    lastMove.current = { x: event.clientX, t: performance.now(), vx: 0 };
   };
 
-  // Navigate only when the gesture is clearly horizontal.
-  const handlePointerUp = (
+  // The page follows the finger once the gesture is clearly horizontal.
+  const handlePointerMove = (
     event: ReactPointerEvent<HTMLDivElement>
   ) => {
     const start = swipeStart.current;
+    if (!start || busy.current) return;
+
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+
+    if (!dragging.current) {
+      if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
+
+      const dir = dx < 0 ? "next" : "prev";
+      if ((dir === "next" && !hasNext) || (dir === "prev" && !hasPrev)) {
+        return;
+      }
+
+      dragging.current = true;
+      setDragDir(dir);
+
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture may not be available everywhere.
+      }
+    }
+
+    const width = event.currentTarget.getBoundingClientRect().width || 1;
+    const now = performance.now();
+    const dt = Math.max(1, now - lastMove.current.t);
+
+    lastMove.current = {
+      x: event.clientX,
+      t: now,
+      vx: (event.clientX - lastMove.current.x) / dt,
+    };
+
+    const wanted = dragDir ?? (dx < 0 ? "next" : "prev");
+    const along = wanted === "next" ? -dx : dx;
+
+    setDragP(Math.max(0, Math.min(1, along / (width * 0.9))));
+  };
+
+  // Finish the turn, or let the page fall back.
+  const handlePointerUp = () => {
+    const start = swipeStart.current;
     swipeStart.current = null;
 
-    if (!start) return;
-
-    const deltaX = event.clientX - start.x;
-    const deltaY = event.clientY - start.y;
-
-    // Ignore short movements and mostly vertical scrolling.
-    if (
-      Math.abs(deltaX) < 55 ||
-      Math.abs(deltaX) < Math.abs(deltaY) * 1.3
-    ) {
+    if (!start || !dragging.current || !dragDir) {
+      dragging.current = false;
       return;
     }
 
-    if (deltaX < 0) {
-      go("next");
+    dragging.current = false;
+
+    const dir = dragDir;
+    const vx = lastMove.current.vx;
+    const flicked = dir === "next" ? vx < -0.5 : vx > 0.5;
+
+    if (dragP > 0.28 || (flicked && dragP > 0.04)) {
+      setDragDir(null);
+      setDragP(0);
+      go(dir);
     } else {
-      go("prev");
+      setSnapping(true);
+      setDragP(0);
+
+      window.setTimeout(() => {
+        setDragDir(null);
+        setSnapping(false);
+      }, 300);
     }
   };
 
   const handlePointerCancel = () => {
     swipeStart.current = null;
+
+    if (dragging.current) {
+      dragging.current = false;
+      setSnapping(true);
+      setDragP(0);
+
+      window.setTimeout(() => {
+        setDragDir(null);
+        setSnapping(false);
+      }, 300);
+    }
   };
 
   // Keyboard navigation.
@@ -512,7 +574,8 @@ export default function BookReader({
 
   const frontClass = [
     "flip-front",
-    direction === "prev" ? "flip-origin-right" : "",
+    activeDir === "prev" ? "flip-origin-right" : "",
+    snapping ? "flip-snap" : "",
     direction === "next" ? "flip-turning-next" : "",
     direction === "prev" ? "flip-turning-prev" : "",
   ]
@@ -606,6 +669,7 @@ export default function BookReader({
         tabIndex={0}
         onKeyDown={onKeyDown}
         onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
         aria-label="Book reader. Swipe horizontally or use the left and right arrow keys to turn pages."
@@ -646,6 +710,13 @@ export default function BookReader({
           style={{
             ...themeStyles[theme],
             ...(resetting ? { transition: "none" } : {}),
+            ...(dragDir && !direction
+              ? {
+                  transform: `rotateY(${(dragDir === "next" ? -1 : 1) * dragP * 178}deg)`,
+                  ...(snapping ? {} : { transition: "none" }),
+                  boxShadow: `${dragDir === "next" ? "-" : ""}${Math.round(dragP * 14)}px 0 ${Math.round(10 + dragP * 20)}px rgba(0,0,0,${(0.06 + dragP * 0.14).toFixed(3)})`,
+                }
+              : {}),
           }}
         >
           <ChapterPage
@@ -664,6 +735,11 @@ export default function BookReader({
 
         <div
           className={`flip-shade${direction ? " flip-shade-on" : ""}`}
+          style={
+            dragDir && !direction
+              ? { opacity: Math.min(1, dragP * 1.2), background: "linear-gradient(90deg, rgba(0,0,0,.16), rgba(0,0,0,.04) 30%, transparent 55%)" }
+              : undefined
+          }
         />
       </div>
 

@@ -473,3 +473,13 @@ header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px 
 }
 /* Reader polish */
 @media (hover: none) { .reader-tip { display: none; } }
+
+/* Drag-to-flip */
+.flip-front.flip-snap {
+  transition: transform 280ms cubic-bezier(0.22, 0.8, 0.3, 1), box-shadow 280ms ease;
+}
+
+/* Let only vertical panning through, so horizontal drags reach the flip handler */
+.book-page {
+  touch-action: pan-y;
+}
