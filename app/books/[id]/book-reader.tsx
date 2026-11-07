@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -24,186 +25,185 @@ type Chapter = {
 
 type ReaderTheme = "paper" | "white" | "night";
 
-const PAGE_TARGET = 1150;
-const FLIP_DURATION = 620;
+const FLIP_DURATION = 420;
+const COL_GAP = 48;
 
-function splitLongBlock(block: string): string[] {
-  const trimmed = block.trim();
+type ViewSize = { w: number; h: number };
 
-  if (!trimmed) return [];
+// Chapter heading + body. Rendered inside a CSS-column container, so the
+// browser itself fills each fixed-size page and flows the rest to the next.
+function ChapterBody({
+  chapter,
+  fontSize,
+}: {
+  chapter: Chapter;
+  fontSize: number;
+}) {
+  const showLabel = !/^\s*chapter\s+\d+/i.test(chapter.title);
 
-  // Keep structured content together whenever possible.
-  if (
-    trimmed.startsWith("```") ||
-    trimmed.startsWith("|") ||
-    /^!\[[^\]]*\]\([^)]+\)$/.test(trimmed) ||
-    /^https?:\/\/\S+$/.test(trimmed)
-  ) {
-    return [trimmed];
-  }
+  return (
+    <>
+      <div className="book-page-header">
+        {showLabel && (
+          <span className="book-page-chapter-label">
+            Chapter {chapter.chapter_number}
+          </span>
+        )}
+        <h1>{chapter.title}</h1>
+        <div className="book-page-rule" />
+      </div>
 
-  // Split exceptionally long paragraphs at sentence boundaries.
-  const sentences = trimmed.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g);
-  if (!sentences || sentences.length < 2) return [trimmed];
-
-  const result: string[] = [];
-  let current = "";
-
-  for (const sentence of sentences) {
-    const next = current ? `${current} ${sentence.trim()}` : sentence.trim();
-
-    if (current && next.length > PAGE_TARGET) {
-      result.push(current);
-      current = sentence.trim();
-    } else {
-      current = next;
-    }
-  }
-
-  if (current) result.push(current);
-
-  return result;
+      <div
+        className="book-page-body"
+        style={{
+          fontSize: `${fontSize}px`,
+          lineHeight: 1.85,
+          overflowWrap: "anywhere",
+        }}
+      >
+        {renderContent(chapter.content)}
+      </div>
+    </>
+  );
 }
 
-function paginateContent(content: string): string[] {
-  const blocks = content
-    .split(/\n\s*\n/)
-    .map((block) => block.trim())
-    .filter(Boolean)
-    .flatMap(splitLongBlock);
+// Counts how many fixed-size pages a chapter needs (hidden, off-screen).
+function ChapterMeasurer({
+  chapter,
+  fontSize,
+  size,
+  onCount,
+}: {
+  chapter: Chapter;
+  fontSize: number;
+  size: ViewSize;
+  onCount: (chapterId: string, pages: number) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
 
-  if (blocks.length === 0) return [""];
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !size.w || !size.h) return;
 
-  const pages: string[] = [];
-  let current: string[] = [];
-  let currentLength = 0;
+    const measure = () => {
+      const pages = Math.max(
+        1,
+        Math.round((el.scrollWidth + COL_GAP) / (size.w + COL_GAP))
+      );
+      onCount(chapter.id, pages);
+    };
 
-  for (const block of blocks) {
-    const extraLength = block.length + (current.length ? 2 : 0);
+    measure();
 
-    if (current.length > 0 && currentLength + extraLength > PAGE_TARGET) {
-      pages.push(current.join("\n\n"));
-      current = [];
-      currentLength = 0;
-    }
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled) measure();
+    });
 
-    const separatorLength = current.length ? 2 : 0;
-    current.push(block);
-    currentLength += block.length + separatorLength;
-  }
+    return () => {
+      cancelled = true;
+    };
+  }, [chapter, fontSize, size.w, size.h, onCount]);
 
-  if (current.length > 0) {
-    pages.push(current.join("\n\n"));
-  }
-
-  return pages.length ? pages : [""];
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position: "absolute",
+        left: -99999,
+        top: 0,
+        width: size.w,
+        height: size.h,
+        visibility: "hidden",
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        ref={ref}
+        className="book-columns"
+        style={{ height: size.h, columnGap: COL_GAP }}
+      >
+        <ChapterBody chapter={chapter} fontSize={fontSize} />
+      </div>
+    </div>
+  );
 }
 
 function ChapterPage({
   chapter,
-  content,
+  pageIndex,
   pageNumber,
-  chapterPageNumber,
-  chapterPageCount,
-  totalChapters,
   bookId,
   priceInr,
   isLoggedIn,
   fontSize,
+  size,
+  viewRef,
 }: {
   chapter: Chapter;
-  content: string;
+  pageIndex: number;
   pageNumber: number;
-  chapterPageNumber: number;
-  chapterPageCount: number;
-  totalChapters: number;
   bookId: string;
   priceInr: number;
   isLoggedIn: boolean;
   fontSize: number;
+  size: ViewSize;
+  viewRef?: React.Ref<HTMLDivElement>;
 }) {
   return (
     <article className="book-page">
-      {chapterPageNumber === 1 ? (
-        <header className="book-page-header">
-          {!/^\s*chapter\s+\d+/i.test(chapter.title) && (
-            <span className="book-page-chapter-label">
-              Chapter {chapter.chapter_number}
-            </span>
-          )}
+      <div className="book-view" ref={viewRef}>
+        {chapter.locked ? (
+          <div style={{ textAlign: "center", padding: "2rem 0" }}>
+            <div style={{ fontSize: "2rem", marginBottom: ".6rem" }}>🔒</div>
 
-          <h1>{chapter.title}</h1>
+            <p
+              style={{
+                fontFamily: "var(--serif)",
+                fontSize: "1.15rem",
+                marginBottom: ".4rem",
+              }}
+            >
+              You&apos;ve reached the end of the free preview.
+            </p>
 
-          <div className="book-page-rule" />
-        </header>
-      ) : (
-        <div
-          style={{
-            fontSize: ".72rem",
-            letterSpacing: ".08em",
-            textTransform: "uppercase",
-            color: "var(--muted)",
-            borderBottom: "1px solid var(--rule)",
-            paddingBottom: ".65rem",
-            marginBottom: "1.4rem",
-          }}
-        >
-          {chapter.title}
-        </div>
-      )}
+            <p
+              style={{
+                color: "var(--muted)",
+                fontSize: ".9rem",
+                marginBottom: "1.4rem",
+              }}
+            >
+              Buy this book to keep reading.
+            </p>
 
-      {chapter.locked ? (
-        <div style={{ textAlign: "center", padding: "2rem 0" }}>
-          <div style={{ fontSize: "2rem", marginBottom: ".6rem" }}>
-            🔒
+            <div style={{ display: "inline-block" }}>
+              <BuyButton
+                bookId={bookId}
+                priceInr={priceInr}
+                isLoggedIn={isLoggedIn}
+              />
+            </div>
           </div>
-
-          <p
-            style={{
-              fontFamily: "var(--serif)",
-              fontSize: "1.15rem",
-              marginBottom: ".4rem",
-            }}
+        ) : (
+          <div
+            className="book-columns"
+            style={
+              {
+                height: size.h || undefined,
+                columnGap: COL_GAP,
+                "--col-h": size.h ? `${size.h}px` : "100%",
+                transform: `translateX(${-pageIndex * (size.w + COL_GAP)}px)`,
+              } as React.CSSProperties
+            }
           >
-            You&apos;ve reached the end of the free preview.
-          </p>
-
-          <p
-            style={{
-              color: "var(--muted)",
-              fontSize: ".9rem",
-              marginBottom: "1.4rem",
-            }}
-          >
-            Buy this book to keep reading.
-          </p>
-
-          <div style={{ display: "inline-block" }}>
-            <BuyButton
-              bookId={bookId}
-              priceInr={priceInr}
-              isLoggedIn={isLoggedIn}
-            />
+            <ChapterBody chapter={chapter} fontSize={fontSize} />
           </div>
-        </div>
-      ) : (
-        <div
-          className="book-page-body"
-          style={{
-            fontSize: `${fontSize}px`,
-            lineHeight: 1.85,
-            overflowWrap: "anywhere",
-          }}
-        >
-          {renderContent(content)}
-        </div>
-      )}
+        )}
+      </div>
 
-      <footer
-        className="book-page-number"
-        aria-label={`Page ${pageNumber}, chapter ${chapterPageNumber} of ${chapterPageCount}`}
-      >
-        <span>{chapter.locked ? "Preview" : pageNumber}</span>
+      <footer className="book-page-number">
+        {chapter.locked ? "Preview" : pageNumber}
       </footer>
     </article>
   );
@@ -247,13 +247,58 @@ export default function BookReader({
   const [snapping, setSnapping] = useState(false);
   const activeDir = direction ?? dragDir;
 
+  const [size, setSize] = useState<ViewSize>({ w: 0, h: 0 });
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const frontViewRef = useRef<HTMLDivElement>(null);
+
+  const handleCount = useCallback((chapterId: string, pages: number) => {
+    setCounts((prev) =>
+      prev[chapterId] === pages ? prev : { ...prev, [chapterId]: pages }
+    );
+  }, []);
+
+  // Track the exact size of one book page's text area.
+  useEffect(() => {
+    const el = frontViewRef.current;
+    if (!el) return;
+
+    const update = () =>
+      setSize((prev) =>
+        prev.w === el.clientWidth && prev.h === el.clientHeight
+          ? prev
+          : { w: el.clientWidth, h: el.clientHeight }
+      );
+
+    update();
+
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+
+    return () => observer.disconnect();
+  }, []);
+
   const pagesByChapter = useMemo(
     () =>
       chapters.map((chapter) =>
-        chapter.locked ? [""] : paginateContent(chapter.content)
+        Array.from(
+          { length: chapter.locked ? 1 : counts[chapter.id] ?? 1 },
+          () => ""
+        )
       ),
-    [chapters]
+    [chapters, counts]
   );
+
+  const measured = chapters.every(
+    (chapter) => chapter.locked || counts[chapter.id] !== undefined
+  );
+
+  // Never stay on a page that no longer exists after a resize or font change.
+  useEffect(() => {
+    if (!measured) return;
+
+    const max = (pagesByChapter[index]?.length ?? 1) - 1;
+    if (pageIndex > max) setPageIndex(Math.max(0, max));
+  }, [measured, pagesByChapter, index, pageIndex]);
 
   // Restore the saved reading position.
   useEffect(() => {
@@ -278,12 +323,8 @@ export default function BookReader({
 
         // Never restore the reader directly into a locked chapter.
         if (!savedChapter.locked) {
-          const maxPage = pagesByChapter[savedIndex].length - 1;
-
           setIndex(savedIndex);
-          setPageIndex(
-            Math.max(0, Math.min(position.pageIndex ?? 0, maxPage))
-          );
+          setPageIndex(Math.max(0, position.pageIndex ?? 0));
 
           router.replace(
             `/books/${bookId}?ch=${savedChapter.chapter_number}`,
@@ -294,7 +335,8 @@ export default function BookReader({
     } catch {
       // Ignore unavailable storage or invalid saved progress.
     }
-  }, [bookId, chapters, pagesByChapter, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookId, chapters, router]);
 
   // Save reading progress whenever the chapter or page changes.
   useEffect(() => {
@@ -313,7 +355,6 @@ export default function BookReader({
 
   const current = chapters[index];
   const currentPages = pagesByChapter[index] ?? [""];
-  const currentPage = currentPages[pageIndex] ?? "";
 
   const totalPages = pagesByChapter.reduce(
     (sum, pages) => sum + pages.length,
@@ -354,9 +395,6 @@ export default function BookReader({
     ? chapters[targetPosition.index]
     : null;
 
-  const targetContent = targetPosition
-    ? pagesByChapter[targetPosition.index]?.[targetPosition.pageIndex] ?? ""
-    : "";
 
   // Turn to the next or previous page.
   const go = useCallback(
@@ -684,7 +722,7 @@ export default function BookReader({
           <div className="flip-back" style={themeStyles[theme]}>
             <ChapterPage
               chapter={targetChapter}
-              content={targetContent}
+              pageIndex={targetPosition.pageIndex}
               pageNumber={
                 pagesByChapter
                   .slice(0, targetPosition.index)
@@ -692,15 +730,11 @@ export default function BookReader({
                 targetPosition.pageIndex +
                 1
               }
-              chapterPageNumber={targetPosition.pageIndex + 1}
-              chapterPageCount={
-                pagesByChapter[targetPosition.index].length
-              }
-              totalChapters={chapters.length}
               bookId={bookId}
               priceInr={priceInr}
               isLoggedIn={isLoggedIn}
               fontSize={fontSize}
+              size={size}
             />
           </div>
         )}
@@ -721,17 +755,28 @@ export default function BookReader({
         >
           <ChapterPage
             chapter={current}
-            content={currentPage}
+            pageIndex={pageIndex}
             pageNumber={pageNumber}
-            chapterPageNumber={pageIndex + 1}
-            chapterPageCount={currentPages.length}
-            totalChapters={chapters.length}
             bookId={bookId}
             priceInr={priceInr}
             isLoggedIn={isLoggedIn}
             fontSize={fontSize}
+            size={size}
+            viewRef={frontViewRef}
           />
         </div>
+
+        {chapters.map((chapter) =>
+          chapter.locked ? null : (
+            <ChapterMeasurer
+              key={chapter.id}
+              chapter={chapter}
+              fontSize={fontSize}
+              size={size}
+              onCount={handleCount}
+            />
+          )
+        )}
 
         <div
           className={`flip-shade${direction ? " flip-shade-on" : ""}`}
