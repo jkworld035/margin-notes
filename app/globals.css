@@ -181,7 +181,6 @@ header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px 
 .book-toc-title{font-family:var(--serif);font-size:1.05rem}
 .book-toc-leader{flex:1;border-bottom:1px dotted var(--muted);opacity:.5;margin:0 .3rem;height:1px;position:relative;top:-4px}
 
-.
 /* ── Premium book page ── */
 .book-page {
   position: relative;
@@ -472,3 +471,5 @@ header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px 
     cursor: default;
   }
 }
+/* Reader polish */
+@media (hover: none) { .reader-tip { display: none; } }

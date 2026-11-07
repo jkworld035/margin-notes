@@ -25,7 +25,7 @@ type Chapter = {
 type ReaderTheme = "paper" | "white" | "night";
 
 const PAGE_TARGET = 1150;
-const FLIP_DURATION = 420;
+const FLIP_DURATION = 620;
 
 function splitLongBlock(block: string): string[] {
   const trimmed = block.trim();
@@ -126,9 +126,11 @@ function ChapterPage({
     <article className="book-page">
       {chapterPageNumber === 1 ? (
         <header className="book-page-header">
-          <span className="book-page-chapter-label">
-            Chapter {chapter.chapter_number}
-          </span>
+          {!/^\s*chapter\s+\d+/i.test(chapter.title) && (
+            <span className="book-page-chapter-label">
+              Chapter {chapter.chapter_number}
+            </span>
+          )}
 
           <h1>{chapter.title}</h1>
 
@@ -201,15 +203,7 @@ function ChapterPage({
         className="book-page-number"
         aria-label={`Page ${pageNumber}, chapter ${chapterPageNumber} of ${chapterPageCount}`}
       >
-        <span>
-          {chapter.locked
-            ? "Preview"
-            : `Chapter ${chapter.chapter_number} · ${chapterPageNumber} / ${chapterPageCount}`}
-        </span>
-
-        <span style={{ marginLeft: ".75rem" }}>
-          {pageNumber} · {totalChapters} chapters
-        </span>
+        <span>{chapter.locked ? "Preview" : pageNumber}</span>
       </footer>
     </article>
   );
@@ -775,6 +769,7 @@ export default function BookReader({
       </div>
 
       <p
+        className="reader-tip"
         style={{
           textAlign: "center",
           color: "var(--muted)",
