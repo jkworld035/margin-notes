@@ -483,3 +483,54 @@ header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px 
 .book-page {
   touch-action: pan-y;
 }
+
+/* Drag-to-flip */
+.flip-front.flip-snap {
+  transition: transform 280ms cubic-bezier(0.22, 0.8, 0.3, 1), box-shadow 280ms ease;
+}
+.book-page {
+  touch-action: pan-y;
+}
+
+/* Fixed-size book pages (no scrolling) */
+.book-page {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.book-view {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+.book-columns {
+  column-count: 1;
+  column-fill: auto;
+  width: 100%;
+  will-change: transform;
+  orphans: 2;
+  widows: 2;
+}
+.book-columns h1,
+.book-columns h2,
+.book-columns h3 {
+  break-after: avoid;
+}
+.book-columns img,
+.book-columns video,
+.book-columns iframe {
+  max-height: var(--col-h, 60vh);
+  object-fit: contain;
+  break-inside: avoid;
+}
+.book-columns pre,
+.book-columns blockquote,
+.book-columns table {
+  break-inside: avoid;
+}
+.book-page .book-page-number {
+  flex-shrink: 0;
+  margin-top: 0.6rem;
+  padding-top: 0.4rem;
+}
