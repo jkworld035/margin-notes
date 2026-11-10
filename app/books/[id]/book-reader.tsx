@@ -15,6 +15,15 @@ import Link from "next/link";
 import { renderContent } from "@/lib/render-content";
 import BuyButton from "./buy-button";
 import { saveReadingProgress } from "@/app/actions/library";
+import { addMark, deleteMark } from "@/app/actions/marks";
+
+type Mark = {
+  id: string;
+  kind: "bookmark" | "highlight";
+  chapter_number: number;
+  chapter_fraction: number;
+  quote: string | null;
+};
 
 type Chapter = {
   id: string;
@@ -227,6 +236,7 @@ export default function BookReader({
   priceInr,
   isLoggedIn,
   initialFraction,
+  initialMarks = [],
 }: {
   bookId: string;
   bookTitle: string;
@@ -235,6 +245,7 @@ export default function BookReader({
   priceInr: number;
   isLoggedIn: boolean;
   initialFraction?: number;
+  initialMarks?: Mark[];
 }) {
   const router = useRouter();
 
@@ -249,6 +260,11 @@ export default function BookReader({
   const [resetting, setResetting] = useState(false);
   const [fontSize, setFontSize] = useState(18);
   const [theme, setTheme] = useState<ReaderTheme>("paper");
+  const [marks, setMarks] = useState<Mark[]>(initialMarks);
+  const [marksOpen, setMarksOpen] = useState(false);
+  const [selectedText, setSelectedText] = useState("");
+  const [markBusy, setMarkBusy] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
 
   const busy = useRef(false);
   const swipeStart = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -662,6 +678,132 @@ export default function BookReader({
     [go]
   );
 
+  // Remember what text is selected inside the book page.
+  useEffect(() => {
+    const onSelection = () => {
+      const selection = window.getSelection();
+      const stage = stageRef.current;
+
+      if (
+        selection &&
+        !selection.isCollapsed &&
+        stage &&
+        selection.anchorNode &&
+        stage.contains(selection.anchorNode)
+      ) {
+        setSelectedText(selection.toString());
+      } else {
+        setSelectedText("");
+      }
+    };
+
+    document.addEventListener("selectionchange", onSelection);
+    return () => document.removeEventListener("selectionchange", onSelection);
+  }, []);
+
+  const pageCount = pagesByChapter[index]?.length ?? 1;
+  const pageStart = pageIndex / pageCount;
+  const pageEnd = (pageIndex + 1) / pageCount;
+
+  const pageBookmarks = marks.filter(
+    (m) =>
+      m.kind === "bookmark" &&
+      m.chapter_number === current?.chapter_number &&
+      Number(m.chapter_fraction) >= pageStart - 1e-6 &&
+      Number(m.chapter_fraction) < pageEnd - 1e-6
+  );
+
+  const requireLogin = () => {
+    if (isLoggedIn) return false;
+    window.alert("Please log in to save bookmarks and highlights.");
+    return true;
+  };
+
+  const toggleBookmark = async () => {
+    if (!current || current.locked || markBusy || requireLogin()) return;
+    setMarkBusy(true);
+
+    try {
+      if (pageBookmarks.length > 0) {
+        const ids = pageBookmarks.map((m) => m.id);
+        const results = await Promise.all(ids.map((id) => deleteMark(id)));
+        const removed = ids.filter((_, i) => !("error" in results[i] && results[i].error));
+        setMarks((prev) => prev.filter((m) => !removed.includes(m.id)));
+      } else {
+        const result = await addMark(
+          bookId,
+          "bookmark",
+          current.chapter_number,
+          pageStart
+        );
+
+        if ("mark" in result && result.mark) {
+          const added = result.mark as Mark;
+          setMarks((prev) => [...prev, added]);
+        } else if ("error" in result && result.error) {
+          window.alert(result.error);
+        }
+      }
+    } finally {
+      setMarkBusy(false);
+    }
+  };
+
+  const saveHighlight = async () => {
+    if (!current || current.locked || !selectedText.trim() || markBusy || requireLogin()) return;
+    setMarkBusy(true);
+
+    try {
+      const result = await addMark(
+        bookId,
+        "highlight",
+        current.chapter_number,
+        pageStart,
+        selectedText
+      );
+
+      if ("mark" in result && result.mark) {
+        const added = result.mark as Mark;
+        setMarks((prev) => [...prev, added]);
+        window.getSelection()?.removeAllRanges();
+        setSelectedText("");
+        setMarksOpen(true);
+      } else if ("error" in result && result.error) {
+        window.alert(result.error);
+      }
+    } finally {
+      setMarkBusy(false);
+    }
+  };
+
+  const removeMark = async (id: string) => {
+    const result = await deleteMark(id);
+    if (!("error" in result && result.error)) {
+      setMarks((prev) => prev.filter((m) => m.id !== id));
+    }
+  };
+
+  const jumpToMark = (mark: Mark) => {
+    const target = chapters.findIndex((c) => c.chapter_number === mark.chapter_number);
+    if (target < 0 || chapters[target].locked) return;
+
+    const fraction = Number(mark.chapter_fraction);
+
+    if (target === index) {
+      const count = pagesByChapter[index]?.length ?? 1;
+      setPageIndex(Math.max(0, Math.min(count - 1, Math.floor(fraction * count + 1e-6))));
+    } else {
+      pendingFraction.current = fraction;
+      setIndex(target);
+      setPageIndex(0);
+      router.replace(`/books/${bookId}?ch=${chapters[target].chapter_number}`, {
+        scroll: false,
+      });
+    }
+
+    setMarksOpen(false);
+  };
+
   const themeStyles: Record<ReaderTheme, React.CSSProperties> = {
     paper: { background: "#f6f0e5", color: "#30291f", borderColor: "#e2d5c1" },
     sepia: { background: "#efe2c4", color: "#4a3a26", borderColor: "#d8c7a0" },
@@ -741,6 +883,40 @@ export default function BookReader({
             A+
           </button>
 
+          <button
+            type="button"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={toggleBookmark}
+            disabled={!current || !!current.locked || markBusy}
+            aria-pressed={pageBookmarks.length > 0}
+            aria-label={pageBookmarks.length > 0 ? "Remove bookmark" : "Bookmark this page"}
+            title={pageBookmarks.length > 0 ? "Remove bookmark" : "Bookmark this page"}
+            className={`reader-tool${pageBookmarks.length > 0 ? " on" : ""}`}
+          >
+            🔖
+          </button>
+
+          {selectedText.trim() && (
+            <button
+              type="button"
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={saveHighlight}
+              disabled={markBusy}
+              className="reader-tool on"
+            >
+              ✎ Highlight
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setMarksOpen((open) => !open)}
+            aria-expanded={marksOpen}
+            className="reader-tool"
+          >
+            Notes ({marks.length})
+          </button>
+
           <div
             role="radiogroup"
             aria-label="Page colour"
@@ -773,9 +949,41 @@ export default function BookReader({
         </div>
       </div>
 
+      {marksOpen && (
+        <div className="marks-panel" role="region" aria-label="Bookmarks and highlights">
+          {marks.length === 0 ? (
+            <p>
+              No bookmarks yet. Tap 🔖 to bookmark a page, or select text and tap ✎ Highlight.
+            </p>
+          ) : (
+            <ul>
+              {marks.map((m) => (
+                <li key={m.id}>
+                  <button type="button" className="marks-jump" onClick={() => jumpToMark(m)}>
+                    <span className="marks-kind">
+                      {m.kind === "highlight" ? "✎" : "🔖"} Chapter {m.chapter_number}
+                    </span>
+                    {m.quote && <span className="marks-quote">“{m.quote}”</span>}
+                  </button>
+                  <button
+                    type="button"
+                    className="marks-remove"
+                    aria-label="Delete"
+                    onClick={() => removeMark(m.id)}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Animated page-turn area */}
       <div
         className="flip-stage"
+        ref={stageRef}
         data-reader-theme={theme}
         tabIndex={0}
         onKeyDown={onKeyDown}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import Stars from "./stars";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -22,6 +23,21 @@ export default async function BooksPage() {
     .select("id, title, description, cover_image_url, price_inr, created_at, profiles!books_author_id_fkey(name)")
     .eq("status", "published")
     .order("created_at", { ascending: false });
+
+  // Average rating per book (skipped quietly if the reviews table is missing).
+  const ratings = new Map<string, { sum: number; n: number }>();
+  if (books && books.length > 0) {
+    const { data: rows } = await supabase
+      .from("book_reviews")
+      .select("book_id, rating")
+      .in("book_id", books.map((b: any) => b.id));
+    for (const row of rows || []) {
+      const cur = ratings.get(row.book_id) ?? { sum: 0, n: 0 };
+      cur.sum += row.rating;
+      cur.n += 1;
+      ratings.set(row.book_id, cur);
+    }
+  }
 
   return (
     <div>
@@ -95,6 +111,12 @@ export default async function BooksPage() {
                 </div>
                 <div className="post-card-title">{b.title}</div>
                 <div className="post-card-excerpt">{b.description}</div>
+                {ratings.get(b.id) && (
+                  <div style={{ display: "flex", gap: ".4rem", alignItems: "center", fontSize: ".75rem", color: "var(--muted)" }}>
+                    <Stars value={ratings.get(b.id)!.sum / ratings.get(b.id)!.n} />
+                    <span>({ratings.get(b.id)!.n})</span>
+                  </div>
+                )}
                 <div className="post-card-meta">
                   <span>{b.profiles?.name}</span>
                   <span className="meta-dot">·</span>

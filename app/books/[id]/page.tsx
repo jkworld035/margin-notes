@@ -6,6 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import BookReader from "./book-reader";
 import BuyButton from "./buy-button";
 import LibraryButton from "./library-button";
+import ReviewSection from "./review-section";
+import Stars from "../stars";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -49,10 +51,10 @@ export default async function BookPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ ch?: string }>;
+  searchParams: Promise<{ ch?: string; at?: string }>;
 }) {
   const { id } = await params;
-  const { ch } = await searchParams;
+  const { ch, at } = await searchParams;
   const supabase = await createClient();
 
   const { data: book } = await supabase
@@ -120,6 +122,7 @@ export default async function BookPage({
   // Reading progress + library state (empty if the library tables don't exist yet).
   let progress: { chapter_number: number; chapter_fraction: number; percent: number; completed: boolean } | null = null;
   let savedInLibrary = false;
+  let marks: { id: string; kind: "bookmark" | "highlight"; chapter_number: number; chapter_fraction: number; quote: string | null }[] = [];
   if (user) {
     const { data: pr } = await supabase
       .from("reading_progress")
@@ -136,6 +139,15 @@ export default async function BookPage({
       .eq("book_id", id)
       .maybeSingle();
     savedInLibrary = !!lib;
+
+    const { data: markRows } = await supabase
+      .from("reader_marks")
+      .select("id, kind, chapter_number, chapter_fraction, quote")
+      .eq("user_id", user.id)
+      .eq("book_id", id)
+      .order("chapter_number", { ascending: true })
+      .order("chapter_fraction", { ascending: true });
+    marks = markRows || [];
   }
 
   const currentNum = ch ? parseInt(ch, 10) : null;
@@ -152,15 +164,43 @@ export default async function BookPage({
           initialIndex={initialIndex}
           priceInr={book.price_inr}
           isLoggedIn={!!user}
+          initialMarks={marks}
           initialFraction={
-            progress && progress.chapter_number === list[initialIndex].chapter_number
-              ? Number(progress.chapter_fraction)
-              : undefined
+            at !== undefined && Number.isFinite(Number(at))
+              ? Math.min(1, Math.max(0, Number(at)))
+              : progress && progress.chapter_number === list[initialIndex].chapter_number
+                ? Number(progress.chapter_fraction)
+                : undefined
           }
         />
       </div>
     );
   }
+
+  // Ratings and reviews (empty if the reviews table doesn't exist yet).
+  const { data: ratingRows } = await supabase
+    .from("book_reviews")
+    .select("rating")
+    .eq("book_id", id);
+  const ratingCount = ratingRows?.length ?? 0;
+  const ratingAverage =
+    ratingCount > 0 ? ratingRows!.reduce((s, r) => s + r.rating, 0) / ratingCount : 0;
+
+  const { data: reviewRows } = await supabase
+    .from("book_reviews")
+    .select("id, user_id, rating, review, created_at, profiles!book_reviews_user_id_fkey(name)")
+    .eq("book_id", id)
+    .order("created_at", { ascending: false })
+    .limit(30);
+  const reviews = (reviewRows || []).map((r: any) => ({
+    id: r.id as string,
+    user_id: r.user_id as string,
+    rating: r.rating as number,
+    review: r.review as string,
+    created_at: r.created_at as string,
+    name: (r.profiles?.name as string | null) ?? null,
+  }));
+  const myReview = user ? reviews.find((r) => r.user_id === user.id) ?? null : null;
 
   const resumeChapter =
     progress && !progress.completed && list.some((c) => c.chapter_number === progress!.chapter_number && !c.locked)
@@ -197,6 +237,14 @@ export default async function BookPage({
             {(book.profiles as any)?.name}
           </Link>
         </div>
+        {ratingCount > 0 && (
+          <div style={{ marginTop: ".7rem", display: "flex", gap: ".5rem", justifyContent: "center", alignItems: "center", fontSize: ".85rem", color: "var(--muted)" }}>
+            <Stars value={ratingAverage} />
+            <span>
+              {ratingAverage.toFixed(1)} · {ratingCount} {ratingCount === 1 ? "rating" : "ratings"}
+            </span>
+          </div>
+        )}
         {book.description && <p className="book-cover-desc">{book.description}</p>}
 
         <div style={{ marginTop: "1.6rem" }}>
@@ -264,6 +312,18 @@ export default async function BookPage({
             </Link>
           ))}
         </nav>
+      )}
+
+      {book.status === "published" && (
+        <ReviewSection
+          bookId={book.id}
+          reviews={reviews}
+          average={ratingAverage}
+          count={ratingCount}
+          myReview={myReview ? { rating: myReview.rating, review: myReview.review } : null}
+          isLoggedIn={!!user}
+          isAuthor={isAuthor}
+        />
       )}
     </div>
   );

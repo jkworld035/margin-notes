@@ -15,6 +15,7 @@ const TABS = [
   { key: "completed", label: "Completed" },
   { key: "purchased", label: "Purchased" },
   { key: "saved", label: "Saved" },
+  { key: "notes", label: "Notes" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -56,6 +57,25 @@ export default async function LibraryPage({
   const progress = new Map<string, Progress>(
     ((progressRes.data || []) as Progress[]).map((p) => [p.book_id, p])
   );
+
+  // Bookmarks and highlights (only loaded for the Notes tab).
+  let notes: { id: string; book_id: string; kind: string; chapter_number: number; chapter_fraction: number; quote: string | null }[] = [];
+  const noteTitles = new Map<string, string>();
+  if (active === "notes") {
+    const { data: markRows } = await supabase
+      .from("reader_marks")
+      .select("id, book_id, kind, chapter_number, chapter_fraction, quote")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(300);
+    notes = markRows || [];
+
+    const noteBookIds = Array.from(new Set(notes.map((n) => n.book_id)));
+    if (noteBookIds.length > 0) {
+      const { data: titled } = await supabase.from("books").select("id, title").in("id", noteBookIds);
+      for (const t of titled || []) noteTitles.set(t.id, t.title);
+    }
+  }
 
   const ids = Array.from(new Set([...purchased, ...saved, ...progress.keys()]));
 
@@ -114,7 +134,27 @@ export default async function LibraryPage({
         ))}
       </div>
 
-      {shown.length === 0 ? (
+      {active === "notes" ? (
+        notes.length === 0 ? (
+          <div className="empty-state" style={{ background: "transparent" }}>
+            No bookmarks or highlights yet. While reading, tap the bookmark button, or select text and tap Highlight.
+          </div>
+        ) : (
+          <ul className="notes-list">
+            {notes.map((n) => (
+              <li key={n.id}>
+                <Link href={`/books/${n.book_id}?ch=${n.chapter_number}&at=${Number(n.chapter_fraction).toFixed(4)}`}>
+                  <span className="notes-kind">{n.kind === "highlight" ? "✎ Highlight" : "🔖 Bookmark"}</span>
+                  <span className="notes-where">
+                    {noteTitles.get(n.book_id) ?? "Book"} · Chapter {n.chapter_number}
+                  </span>
+                  {n.quote && <span className="notes-quote">“{n.quote}”</span>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : shown.length === 0 ? (
         <div className="empty-state" style={{ background: "transparent" }}>
           {active === "all"
             ? "Your library is empty. Save a book or start reading and it will appear here."
