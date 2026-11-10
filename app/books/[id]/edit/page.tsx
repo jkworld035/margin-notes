@@ -15,6 +15,7 @@ import {
 } from "@/app/actions/books";
 import EditorToolbar from "@/app/write/editor-toolbar";
 import CoverImageUpload from "@/app/write/cover-image-upload";
+import CoverDesigner from "@/app/books/cover-designer";
 import { wordCount, estimateReadTimeClient } from "@/lib/text-stats";
 import { renderContent } from "@/lib/render-content";
 
@@ -44,6 +45,8 @@ export default function EditBookPage() {
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [status, setStatus] = useState<"draft" | "published">("draft");
   const [price, setPrice] = useState("0");
+  const [previewChapters, setPreviewChapters] = useState("1");
+  const [designerOpen, setDesignerOpen] = useState(false);
   const [detailsSaved, setDetailsSaved] = useState(true);
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -102,7 +105,7 @@ export default function EditBookPage() {
         }
         const { data: book, error: bookError } = await supabase
           .from("books")
-          .select("title, description, cover_image_url, status, author_id, price_inr")
+          .select("title, description, cover_image_url, status, author_id, price_inr, preview_chapters")
           .eq("id", bookId)
           .maybeSingle();
         if (bookError) throw bookError;
@@ -122,6 +125,7 @@ export default function EditBookPage() {
         setCoverImageUrl(book.cover_image_url ?? "");
         setStatus(book.status);
         setPrice(String(book.price_inr ?? 0));
+        setPreviewChapters(String(book.preview_chapters ?? 1));
         const list: Chapter[] = chapterRows ?? [];
         setChapters(list);
         openChapter(list[0] ?? null);
@@ -235,6 +239,7 @@ export default function EditBookPage() {
       form.set("description", description);
       form.set("coverImageUrl", coverImageUrl);
       form.set("price", price);
+      form.set("previewChapters", previewChapters);
       const result = await updateBook(bookId, form);
       if (result?.error) throw new Error(result.error);
       detailsSavedRef.current = true;
@@ -396,9 +401,26 @@ export default function EditBookPage() {
               <div className="form-group">
                 <label htmlFor="book-price">Price (₹)</label>
                 <input id="book-price" type="number" min={0} max={100000} step={1} value={price} onChange={(e) => { setPrice(e.target.value); setDetailsDirty(); }} />
-                <div className="form-hint">0 = free. For paid books, the first chapter stays free as a preview. Past purchases keep the price they were bought at.</div>
+                <div className="form-hint">0 = free. Past purchases keep the price they were bought at.</div>
               </div>
-              <div className="form-group"><label>Cover Image</label><CoverImageUpload onUploaded={(url) => { setCoverImageUrl(url); setDetailsDirty(); }} initialUrl={coverImageUrl} /></div>
+              {Number(price) > 0 && (
+                <div className="form-group">
+                  <label htmlFor="book-preview">Free preview</label>
+                  <select id="book-preview" value={previewChapters} onChange={(e) => { setPreviewChapters(e.target.value); setDetailsDirty(); }}>
+                    <option value="0">No free preview</option>
+                    <option value="1">First chapter free</option>
+                    <option value="2">First 2 chapters free</option>
+                    <option value="3">First 3 chapters free</option>
+                    <option value="5">First 5 chapters free</option>
+                    <option value="10">First 10 chapters free</option>
+                  </select>
+                  <div className="form-hint">Readers can read these chapters before buying.</div>
+                </div>
+              )}
+              <div className="form-group"><label>Cover Image</label><CoverImageUpload onUploaded={(url) => { setCoverImageUrl(url); setDetailsDirty(); }} initialUrl={coverImageUrl} />
+                <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: ".6rem" }} onClick={() => setDesignerOpen((o) => !o)}>{designerOpen ? "Close cover designer" : "🎨 Design a cover instead"}</button>
+                {designerOpen && <CoverDesigner initialTitle={title} onUploaded={(url) => { setCoverImageUrl(url); setDetailsDirty(); }} />}
+              </div>
               <button className="btn btn-primary btn-sm" type="button" onClick={() => void saveBookDetails()} disabled={busy || detailsSaved}>{busy ? "Saving..." : detailsSaved ? "Details Saved" : "Save Details"}</button>
             </div>
           </details>

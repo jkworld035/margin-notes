@@ -60,7 +60,7 @@ export default async function BookPage({
   const { data: book } = await supabase
     .from("books")
     .select(
-      "id, title, description, cover_image_url, status, author_id, price_inr, profiles!books_author_id_fkey(name)"
+      "id, title, description, cover_image_url, status, author_id, price_inr, preview_chapters, profiles!books_author_id_fkey(name)"
     )
     .eq("id", id)
     .single();
@@ -259,7 +259,11 @@ export default async function BookPage({
               <div style={{ fontFamily: "var(--serif)", fontSize: "1.8rem" }}>₹{book.price_inr}</div>
               <BuyButton bookId={book.id} priceInr={book.price_inr} isLoggedIn={!!user} />
               <span style={{ fontSize: ".78rem", color: "var(--muted)" }}>
-                The first chapter is free to read as a preview.
+                {book.preview_chapters === 0
+                  ? "This book has no free preview."
+                  : book.preview_chapters === 1
+                    ? "The first chapter is free to read as a preview."
+                    : `The first ${book.preview_chapters} chapters are free to read as a preview.`}
               </span>
             </div>
           )}
@@ -275,7 +279,7 @@ export default async function BookPage({
           )}
         </div>
 
-        {list.length > 0 && (
+        {list.some((c) => !c.locked) && (
           <div style={{ marginTop: "1.4rem", display: "flex", gap: ".6rem", justifyContent: "center", flexWrap: "wrap" }}>
             <Link href={`/books/${book.id}?ch=${resumeChapter}`} className="btn btn-primary">
               {progress && !progress.completed && progress.percent > 0

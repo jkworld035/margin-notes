@@ -38,6 +38,8 @@ function parseBookDetails(formData: FormData) {
   const description = String(formData.get("description") ?? "").trim();
   const coverImageUrl = String(formData.get("coverImageUrl") ?? "").trim();
   const priceResult = parsePrice(formData.get("price"));
+  const previewRaw = String(formData.get("previewChapters") ?? "1").trim();
+  const previewChapters = previewRaw === "" ? 1 : Number(previewRaw);
 
   if (!title) return { error: "Give your book a title." };
 
@@ -51,6 +53,10 @@ function parseBookDetails(formData: FormData) {
 
   if ("error" in priceResult) {
     return { error: priceResult.error };
+  }
+
+  if (!Number.isInteger(previewChapters) || previewChapters < 0 || previewChapters > 20) {
+    return { error: "Free preview must be between 0 and 20 chapters." };
   }
 
   if (coverImageUrl.length > 2048) {
@@ -75,6 +81,7 @@ function parseBookDetails(formData: FormData) {
       description,
       cover_image_url: coverImageUrl || null,
       price_inr: priceResult.price,
+      preview_chapters: previewChapters,
     },
   };
 }

@@ -4,12 +4,16 @@ import { useState } from "react";
 import { createBook } from "@/app/actions/books";
 import CoverImageUpload from "@/app/write/cover-image-upload";
 import { BOOK_TEMPLATES } from "../book-templates";
+import CoverDesigner from "../cover-designer";
 
 export default function NewBookPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [templateId, setTemplateId] = useState("");
+  const [bookTitle, setBookTitle] = useState("");
+  const [priceValue, setPriceValue] = useState("0");
+  const [designerOpen, setDesignerOpen] = useState(false);
 
   const selected = BOOK_TEMPLATES.find((t) => t.id === templateId);
 
@@ -80,7 +84,7 @@ export default function NewBookPage() {
 
         <div className="form-group">
           <label>Title</label>
-          <input name="title" type="text" placeholder="Your book's title…" maxLength={150} required />
+          <input name="title" type="text" placeholder="Your book's title…" maxLength={150} required value={bookTitle} onChange={(e) => setBookTitle(e.target.value)} />
         </div>
 
         <div className="form-group">
@@ -95,16 +99,34 @@ export default function NewBookPage() {
 
         <div className="form-group">
           <label>Price (₹)</label>
-          <input name="price" type="number" min={0} max={100000} step={1} defaultValue={0} />
+          <input name="price" type="number" min={0} max={100000} step={1} value={priceValue} onChange={(e) => setPriceValue(e.target.value)} />
           <div className="form-hint">
             Enter 0 to make the book free. For a paid book, readers can read the first chapter free and unlock
             the rest by buying it.
           </div>
         </div>
 
+        {Number(priceValue) > 0 && (
+          <div className="form-group">
+            <label>Free preview</label>
+            <select name="previewChapters" defaultValue="1">
+              <option value="0">No free preview</option>
+              <option value="1">First chapter free</option>
+              <option value="2">First 2 chapters free</option>
+              <option value="3">First 3 chapters free</option>
+              <option value="5">First 5 chapters free</option>
+            </select>
+            <div className="form-hint">Readers can read these chapters before buying. You can change this any time.</div>
+          </div>
+        )}
+
         <div className="form-group">
           <label>Cover Image (optional)</label>
           <CoverImageUpload onUploaded={setCoverImageUrl} />
+          <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: ".6rem" }} onClick={() => setDesignerOpen((o) => !o)}>
+            {designerOpen ? "Close cover designer" : "🎨 Design a cover instead"}
+          </button>
+          {designerOpen && <CoverDesigner initialTitle={bookTitle} onUploaded={setCoverImageUrl} />}
           <input type="hidden" name="coverImageUrl" value={coverImageUrl} />
         </div>
 
