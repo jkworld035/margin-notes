@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { renderContent } from "@/lib/render-content";
 import BuyButton from "./buy-button";
+import { saveReadingProgress } from "@/app/actions/library";
 
 type Chapter = {
   id: string;
@@ -23,7 +24,16 @@ type Chapter = {
   locked?: boolean;
 };
 
-type ReaderTheme = "paper" | "white" | "night";
+type ReaderTheme = "paper" | "sepia" | "white" | "night";
+
+const THEMES: { key: ReaderTheme; label: string; swatch: string }[] = [
+  { key: "paper", label: "Paper", swatch: "#fbf7ee" },
+  { key: "sepia", label: "Sepia", swatch: "#efe2c4" },
+  { key: "white", label: "White", swatch: "#ffffff" },
+  { key: "night", label: "Night", swatch: "#1b1b1e" },
+];
+
+const PREFS_KEY = "mn-reader-prefs";
 
 const FLIP_DURATION = 420;
 const COL_GAP = 48;
@@ -216,6 +226,7 @@ export default function BookReader({
   initialIndex,
   priceInr,
   isLoggedIn,
+  initialFraction,
 }: {
   bookId: string;
   bookTitle: string;
@@ -223,6 +234,7 @@ export default function BookReader({
   initialIndex: number;
   priceInr: number;
   isLoggedIn: boolean;
+  initialFraction?: number;
 }) {
   const router = useRouter();
 
@@ -300,58 +312,116 @@ export default function BookReader({
     if (pageIndex > max) setPageIndex(Math.max(0, max));
   }, [measured, pagesByChapter, index, pageIndex]);
 
-  // Restore the saved reading position.
+  // Position to restore once this chapter has been measured (0..1 through
+  // the chapter, so it survives different screen sizes and font sizes).
+  const pendingFraction = useRef<number | null>(
+    typeof initialFraction === "number" ? initialFraction : null
+  );
+
+  // Logged-out readers: fall back to this device's saved position.
   useEffect(() => {
+    if (pendingFraction.current !== null) return;
+
     try {
-      const saved = window.localStorage.getItem(
-        `margin-notes-reader-${bookId}`
-      );
+      const saved = JSON.parse(
+        window.localStorage.getItem(`margin-notes-reader-${bookId}`) || "null"
+      ) as { chapterNumber?: number; fraction?: number } | null;
 
-      if (!saved) return;
-
-      const position = JSON.parse(saved) as {
-        chapterNumber?: number;
-        pageIndex?: number;
-      };
-
-      const savedIndex = chapters.findIndex(
-        (chapter) => chapter.chapter_number === position.chapterNumber
-      );
-
-      if (savedIndex >= 0) {
-        const savedChapter = chapters[savedIndex];
-
-        // Never restore the reader directly into a locked chapter.
-        if (!savedChapter.locked) {
-          setIndex(savedIndex);
-          setPageIndex(Math.max(0, position.pageIndex ?? 0));
-
-          router.replace(
-            `/books/${bookId}?ch=${savedChapter.chapter_number}`,
-            { scroll: false }
-          );
-        }
+      if (
+        saved &&
+        typeof saved.fraction === "number" &&
+        saved.chapterNumber === chapters[safeInitialIndex]?.chapter_number
+      ) {
+        pendingFraction.current = saved.fraction;
       }
     } catch {
       // Ignore unavailable storage or invalid saved progress.
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookId, chapters, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Save reading progress whenever the chapter or page changes.
+  const currentMeasured =
+    !!chapters[index] &&
+    (chapters[index].locked || counts[chapters[index].id] !== undefined);
+
   useEffect(() => {
+    if (!currentMeasured || pendingFraction.current === null) return;
+
+    const fraction = pendingFraction.current;
+    pendingFraction.current = null;
+
+    const count = pagesByChapter[index]?.length ?? 1;
+    setPageIndex(Math.max(0, Math.min(count - 1, Math.floor(fraction * count))));
+  }, [currentMeasured, pagesByChapter, index]);
+
+  // Reader preferences (theme + text size) are remembered on this device.
+  useEffect(() => {
+    try {
+      const prefs = JSON.parse(window.localStorage.getItem(PREFS_KEY) || "null");
+
+      if (prefs && THEMES.some((t) => t.key === prefs.theme)) {
+        setTheme(prefs.theme);
+      }
+
+      if (prefs && Number.isFinite(prefs.fontSize)) {
+        setFontSize(Math.max(14, Math.min(24, Math.round(prefs.fontSize))));
+      }
+    } catch {
+      // Defaults are fine.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(PREFS_KEY, JSON.stringify({ theme, fontSize }));
+    } catch {
+      // Reading still works without storage.
+    }
+  }, [theme, fontSize]);
+
+  // Save reading progress: on this device immediately, to the account shortly after.
+  useEffect(() => {
+    if (!currentMeasured || pendingFraction.current !== null) return;
+
+    const chapter = chapters[index];
+    if (!chapter || chapter.locked) return;
+
+    const count = pagesByChapter[index]?.length ?? 1;
+    const fraction = count > 0 ? pageIndex / count : 0;
+
     try {
       window.localStorage.setItem(
         `margin-notes-reader-${bookId}`,
-        JSON.stringify({
-          chapterNumber: chapters[index]?.chapter_number,
-          pageIndex,
-        })
+        JSON.stringify({ chapterNumber: chapter.chapter_number, fraction })
       );
     } catch {
       // Reading still works when browser storage is unavailable.
     }
-  }, [bookId, chapters, index, pageIndex]);
+
+    if (!isLoggedIn || !measured) return;
+
+    const total = pagesByChapter.reduce((sum, pages) => sum + pages.length, 0);
+    const number =
+      pagesByChapter.slice(0, index).reduce((sum, pages) => sum + pages.length, 0) +
+      pageIndex +
+      1;
+    const percent = Math.round((number / Math.max(total, 1)) * 100);
+    const lastReadable = chapters.reduce(
+      (last, c, i) => (c.locked ? last : i),
+      0
+    );
+    const finished = index === lastReadable && pageIndex === count - 1 && chapter === chapters[chapters.length - 1];
+
+    const timer = window.setTimeout(() => {
+      saveReadingProgress(bookId, chapter.chapter_number, fraction, percent, finished).catch(
+        () => {
+          // Progress is also kept locally, so a failed sync is not fatal.
+        }
+      );
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [bookId, chapters, index, pageIndex, pagesByChapter, currentMeasured, measured, isLoggedIn]);
 
   const current = chapters[index];
   const currentPages = pagesByChapter[index] ?? [""];
@@ -593,21 +663,10 @@ export default function BookReader({
   );
 
   const themeStyles: Record<ReaderTheme, React.CSSProperties> = {
-    paper: {
-      background: "#f6f0e5",
-      color: "#30291f",
-      borderColor: "#e2d5c1",
-    },
-    white: {
-      background: "#ffffff",
-      color: "#202020",
-      borderColor: "#e5e5e5",
-    },
-    night: {
-      background: "#202124",
-      color: "#e8e3d9",
-      borderColor: "#414247",
-    },
+    paper: { background: "#f6f0e5", color: "#30291f", borderColor: "#e2d5c1" },
+    sepia: { background: "#efe2c4", color: "#4a3a26", borderColor: "#d8c7a0" },
+    white: { background: "#ffffff", color: "#202020", borderColor: "#e5e5e5" },
+    night: { background: "#1b1b1e", color: "#dcd8cf", borderColor: "#3a3a3f" },
   };
 
   const frontClass = [
@@ -682,28 +741,42 @@ export default function BookReader({
             A+
           </button>
 
-          <label htmlFor="reader-theme" style={{ marginLeft: ".35rem" }}>
-            Theme
-          </label>
-
-          <select
-            id="reader-theme"
-            value={theme}
-            onChange={(event) =>
-              setTheme(event.target.value as ReaderTheme)
-            }
-            style={{ padding: ".4rem", borderRadius: "4px" }}
+          <div
+            role="radiogroup"
+            aria-label="Page colour"
+            style={{ display: "flex", gap: ".4rem", marginLeft: ".4rem" }}
           >
-            <option value="paper">Paper</option>
-            <option value="white">White</option>
-            <option value="night">Night</option>
-          </select>
+            {THEMES.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                role="radio"
+                aria-checked={theme === t.key}
+                aria-label={t.label}
+                title={t.label}
+                onClick={() => setTheme(t.key)}
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: "50%",
+                  background: t.swatch,
+                  border:
+                    theme === t.key
+                      ? "2px solid var(--accent)"
+                      : "1px solid var(--rule)",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Animated page-turn area */}
       <div
         className="flip-stage"
+        data-reader-theme={theme}
         tabIndex={0}
         onKeyDown={onKeyDown}
         onPointerDown={handlePointerDown}

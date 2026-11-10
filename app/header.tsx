@@ -54,6 +54,9 @@ export default async function Header() {
             <Link href="/books" className="nav-btn">
               Books
             </Link>
+            <Link href="/library" className="nav-btn">
+              Library
+            </Link>
             <Link href="/write" className="nav-btn">
               Write
             </Link>

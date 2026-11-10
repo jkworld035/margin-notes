@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import BookReader from "./book-reader";
 import BuyButton from "./buy-button";
+import LibraryButton from "./library-button";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -116,6 +117,27 @@ export default async function BookPage({
     }
   }
 
+  // Reading progress + library state (empty if the library tables don't exist yet).
+  let progress: { chapter_number: number; chapter_fraction: number; percent: number; completed: boolean } | null = null;
+  let savedInLibrary = false;
+  if (user) {
+    const { data: pr } = await supabase
+      .from("reading_progress")
+      .select("chapter_number, chapter_fraction, percent, completed")
+      .eq("user_id", user.id)
+      .eq("book_id", id)
+      .maybeSingle();
+    progress = pr;
+
+    const { data: lib } = await supabase
+      .from("library_books")
+      .select("book_id")
+      .eq("user_id", user.id)
+      .eq("book_id", id)
+      .maybeSingle();
+    savedInLibrary = !!lib;
+  }
+
   const currentNum = ch ? parseInt(ch, 10) : null;
   const initialIndex = currentNum ? list.findIndex((c) => c.chapter_number === currentNum) : -1;
 
@@ -130,10 +152,20 @@ export default async function BookPage({
           initialIndex={initialIndex}
           priceInr={book.price_inr}
           isLoggedIn={!!user}
+          initialFraction={
+            progress && progress.chapter_number === list[initialIndex].chapter_number
+              ? Number(progress.chapter_fraction)
+              : undefined
+          }
         />
       </div>
     );
   }
+
+  const resumeChapter =
+    progress && !progress.completed && list.some((c) => c.chapter_number === progress!.chapter_number && !c.locked)
+      ? progress.chapter_number
+      : list[0]?.chapter_number;
 
   // Cover / table-of-contents view
   return (
@@ -194,6 +226,19 @@ export default async function BookPage({
             <span style={{ fontSize: ".85rem", color: "var(--muted)" }}>Paid book · ₹{book.price_inr}</span>
           )}
         </div>
+
+        {list.length > 0 && (
+          <div style={{ marginTop: "1.4rem", display: "flex", gap: ".6rem", justifyContent: "center", flexWrap: "wrap" }}>
+            <Link href={`/books/${book.id}?ch=${resumeChapter}`} className="btn btn-primary">
+              {progress && !progress.completed && progress.percent > 0
+                ? `Continue Reading · ${progress.percent}%`
+                : progress?.completed
+                  ? "Read again"
+                  : "Start Reading"}
+            </Link>
+            {user && !isAuthor && <LibraryButton bookId={book.id} initialSaved={savedInLibrary} />}
+          </div>
+        )}
 
         {isAuthor && (
           <div style={{ marginTop: "1.4rem" }}>
