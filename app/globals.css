@@ -632,3 +632,8 @@ header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px 
 .cd-row select { padding: .4rem; background: var(--white); border: 1px solid var(--rule); color: var(--ink); font-family: var(--sans); }
 .cd-colors input[type="color"] { width: 44px; height: 32px; padding: 0; border: 1px solid var(--rule); background: none; }
 @media (max-width: 640px) { .cd { grid-template-columns: 1fr; } .cd-preview { max-width: 220px; } }
+
+/* ── Book views / likes / claps ── */
+.engage { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; align-items: center; margin-top: .9rem; }
+.engage-stat { font-size: .82rem; color: var(--muted); margin-right: .3rem; }
+.engage-mine { margin-left: .35rem; font-size: .7rem; opacity: .85; }

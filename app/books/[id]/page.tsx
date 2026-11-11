@@ -8,6 +8,7 @@ import BuyButton from "./buy-button";
 import LibraryButton from "./library-button";
 import ReviewSection from "./review-section";
 import Stars from "../stars";
+import BookEngagement from "./book-engagement";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -183,6 +184,11 @@ export default async function BookPage({
     .select("rating")
     .eq("book_id", id);
   const ratingCount = ratingRows?.length ?? 0;
+
+  const { data: engagementRows } = await supabase.rpc("book_engagement", { p_book_id: book.id });
+  const engagement = (engagementRows as Array<{
+    views: number; likes: number; claps: number; my_liked: boolean; my_claps: number;
+  }> | null)?.[0];
   const ratingAverage =
     ratingCount > 0 ? ratingRows!.reduce((s, r) => s + r.rating, 0) / ratingCount : 0;
 
@@ -245,6 +251,16 @@ export default async function BookPage({
             </span>
           </div>
         )}
+        <BookEngagement
+          bookId={book.id}
+          views={Number(engagement?.views ?? 0)}
+          likes={Number(engagement?.likes ?? 0)}
+          claps={Number(engagement?.claps ?? 0)}
+          myLiked={Boolean(engagement?.my_liked)}
+          myClaps={Number(engagement?.my_claps ?? 0)}
+          isLoggedIn={!!user}
+          canReact={!isAuthor}
+        />
         {book.description && <p className="book-cover-desc">{book.description}</p>}
 
         <div style={{ marginTop: "1.6rem" }}>
