@@ -24,6 +24,9 @@ export default function Footer() {
       <Link href="/privacy" style={{ color: "inherit" }}>
         Privacy Policy
       </Link>
+      <Link href="/terms" style={{ color: "inherit" }}>
+        Terms of Service
+      </Link>
       <a href="/rss.xml" style={{ color: "inherit" }}>
         RSS Feed
       </a>

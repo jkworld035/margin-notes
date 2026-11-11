@@ -25,7 +25,7 @@ export async function generateMetadata({
   const supabase = await createClient();
   const { data: post } = await supabase
     .from("posts")
-    .select("title, excerpt, cover_image_url, profiles!posts_author_id_fkey(name)")
+    .select("title, excerpt, content, cover_image_url, profiles!posts_author_id_fkey(name)")
     .eq("id", id)
     .single();
 
@@ -36,10 +36,14 @@ export async function generateMetadata({
   const description = post.excerpt;
   const url = `${siteUrl}/post/${id}`;
 
+  // Very short posts are kept out of search results so thin pages don't hurt the site's quality.
+  const words = String(post.content ?? "").replace(/<[^>]*>/g, " ").split(/\s+/).filter(Boolean).length;
+
   return {
     title,
     description,
     alternates: { canonical: url },
+    ...(words < 300 ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       title: post.title,
       description,
