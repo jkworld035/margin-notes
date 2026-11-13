@@ -9,6 +9,7 @@ import LibraryButton from "./library-button";
 import ReviewSection from "./review-section";
 import Stars from "../stars";
 import BookEngagement from "./book-engagement";
+import ResumeLink from "./resume-link";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -297,13 +298,18 @@ export default async function BookPage({
 
         {list.some((c) => !c.locked) && (
           <div style={{ marginTop: "1.4rem", display: "flex", gap: ".6rem", justifyContent: "center", flexWrap: "wrap" }}>
-            <Link href={`/books/${book.id}?ch=${resumeChapter}`} className="btn btn-primary">
-              {progress && !progress.completed && progress.percent > 0
-                ? `Continue Reading · ${progress.percent}%`
-                : progress?.completed
-                  ? "Read again"
-                  : "Start Reading"}
-            </Link>
+            <ResumeLink
+              bookId={book.id}
+              href={`/books/${book.id}?ch=${resumeChapter}`}
+              hasServerProgress={!!progress}
+              label={
+                progress && !progress.completed && progress.percent > 0
+                  ? `Continue Reading · ${progress.percent}%`
+                  : progress?.completed
+                    ? "Read again"
+                    : "Start Reading"
+              }
+            />
             {user && !isAuthor && <LibraryButton bookId={book.id} initialSaved={savedInLibrary} />}
           </div>
         )}

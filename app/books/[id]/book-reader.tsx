@@ -395,6 +395,41 @@ export default function BookReader({
     }
   }, [theme, fontSize]);
 
+  // Latest position, so it can be flushed when the tab is closed or hidden.
+  const latestProgress = useRef<{
+    chapterNumber: number;
+    fraction: number;
+    percent: number;
+    completed: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const flush = () => {
+      const p = latestProgress.current;
+      if (!p) return;
+      try {
+        navigator.sendBeacon(
+          "/api/reading-progress",
+          new Blob([JSON.stringify({ bookId, ...p })], { type: "application/json" })
+        );
+      } catch {
+        // The position is also stored on this device.
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [bookId, isLoggedIn]);
+
   // Save reading progress: on this device immediately, to the account shortly after.
   useEffect(() => {
     if (!currentMeasured || pendingFraction.current !== null) return;
@@ -427,6 +462,13 @@ export default function BookReader({
       0
     );
     const finished = index === lastReadable && pageIndex === count - 1 && chapter === chapters[chapters.length - 1];
+
+    latestProgress.current = {
+      chapterNumber: chapter.chapter_number,
+      fraction,
+      percent,
+      completed: finished,
+    };
 
     const timer = window.setTimeout(() => {
       saveReadingProgress(bookId, chapter.chapter_number, fraction, percent, finished).catch(
