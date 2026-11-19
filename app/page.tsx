@@ -3,6 +3,7 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { estimateReadTime } from "./actions/posts";
+import { getCurrentUser } from "@/lib/supabase/get-user";
 import AdSlot from "./ad-slot";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -33,10 +34,7 @@ export default async function HomePage({
   const { category, tag, q } = await searchParams;
   const active = category || "All";
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   let posts: any[] | null = null;
   let sectionTitle = "Latest Stories";
@@ -48,7 +46,8 @@ export default async function HomePage({
       .select("id, title, excerpt, category, created_at, content, cover_image_url, tags, profiles!posts_author_id_fkey(name)")
       .eq("status", "approved")
       .or(`title.ilike.%${q}%,excerpt.ilike.%${q}%`)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(30);
     posts = data;
   } else if (tag) {
     sectionTitle = `Tagged "${tag}"`;
@@ -57,7 +56,8 @@ export default async function HomePage({
       .select("id, title, excerpt, category, created_at, content, cover_image_url, tags, profiles!posts_author_id_fkey(name)")
       .eq("status", "approved")
       .contains("tags", [tag])
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(30);
     posts = data;
   } else if (active === "Following" && user) {
     sectionTitle = "From people you follow";
@@ -76,7 +76,8 @@ export default async function HomePage({
         .select("id, title, excerpt, category, created_at, content, cover_image_url, tags, profiles!posts_author_id_fkey(name)")
         .eq("status", "approved")
         .in("author_id", ids)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+      .limit(30);
       posts = data;
     }
   } else {
@@ -84,47 +85,53 @@ export default async function HomePage({
       .from("posts")
       .select("id, title, excerpt, category, created_at, content, cover_image_url, tags, profiles!posts_author_id_fkey(name)")
       .eq("status", "approved")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(30);
 
     if (active !== "All") query = query.eq("category", active);
     const { data } = await query;
     posts = data;
   }
 
-  // Trending: top 5 by like count among recent posts
-  const { data: allApproved } = await supabase
-    .from("posts")
-    .select("id, title, profiles!posts_author_id_fkey(name)")
-    .eq("status", "approved")
-    .order("created_at", { ascending: false })
-    .limit(30);
+  // Trending and the tag cloud don't depend on each other, so fetch them together.
+  const [trending, tagSource] = await Promise.all([
+    (async () => {
+      const { data: allApproved } = await supabase
+        .from("posts")
+        .select("id, title, profiles!posts_author_id_fkey(name)")
+        .eq("status", "approved")
+        .order("created_at", { ascending: false })
+        .limit(30);
 
-  let trending: { id: string; title: string; author: string; claps: number }[] = [];
-  if (allApproved && allApproved.length > 0) {
-    const ids = allApproved.map((p) => p.id);
-    const { data: likeRows } = await supabase.from("likes").select("post_id").in("post_id", ids);
-    const counts: Record<string, number> = {};
-    (likeRows || []).forEach((l) => {
-      counts[l.post_id] = (counts[l.post_id] || 0) + 1;
-    });
-    trending = allApproved
-      .map((p) => ({
-        id: p.id,
-        title: p.title,
-        author: (p.profiles as any)?.name || "",
-        claps: counts[p.id] || 0,
-      }))
-      .sort((a, b) => b.claps - a.claps)
-      .slice(0, 5);
-  }
+      if (!allApproved || allApproved.length === 0) {
+        return [] as { id: string; title: string; author: string; claps: number }[];
+      }
 
-  // Tag cloud from recent approved posts
-  const { data: tagSource } = await supabase
-    .from("posts")
-    .select("tags")
-    .eq("status", "approved")
-    .order("created_at", { ascending: false })
-    .limit(100);
+      const ids = allApproved.map((p) => p.id);
+      const { data: likeRows } = await supabase.from("likes").select("post_id").in("post_id", ids);
+      const counts: Record<string, number> = {};
+      (likeRows || []).forEach((l) => {
+        counts[l.post_id] = (counts[l.post_id] || 0) + 1;
+      });
+      return allApproved
+        .map((p) => ({
+          id: p.id,
+          title: p.title,
+          author: (p.profiles as any)?.name || "",
+          claps: counts[p.id] || 0,
+        }))
+        .sort((a, b) => b.claps - a.claps)
+        .slice(0, 5);
+    })(),
+    supabase
+      .from("posts")
+      .select("tags")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false })
+      .limit(100)
+      .then((res) => res.data),
+  ]);
+
   const tagCounts: Record<string, number> = {};
   (tagSource || []).forEach((p) => {
     (p.tags || []).forEach((t: string) => {

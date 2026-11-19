@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/get-user";
 import { signOut } from "./actions/auth";
 import ThemeToggle from "./theme-toggle";
 
 export default async function Header() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   let profile: { name: string; role: string; avatar_url: string | null } | null = null;
   let unreadCount = 0;
